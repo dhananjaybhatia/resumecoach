@@ -48,5 +48,5 @@ export const getCompanion = async (id: string) => {
 
     if (error) return console.log(error)
 
-    return [0]
+    return data[0]
 }
