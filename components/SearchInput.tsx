@@ -1,7 +1,7 @@
 "use client";
 
-import { formUrlQuery, removeKeysFromUrlQuery } from "@jsmastery/utils";
 import Image from "next/image";
+import { formUrlQuery, removeKeysFromUrlQuery } from "@jsmastery/utils";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 

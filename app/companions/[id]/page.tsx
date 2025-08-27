@@ -1,6 +1,8 @@
-import React from "react";
+interface CompanionSessionPageProps {
+  params: Promise<{ id: string }>;
+}
 
-const CompanionSession = () => {
+const CompanionSession = ({ params }: CompanionSessionPageProps) => {
   return <div>CompanionSession</div>;
 };
 
