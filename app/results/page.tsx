@@ -294,8 +294,9 @@ function isEducationLine(s: string) {
    Quantified bullet extractor
    ========================= */
 function extractQuantifiedExamples(bullets: string[], limit = 3): string[] {
+  // Enhanced regex to catch more types of quantified achievements
   const metricRe =
-    /\b(\d+(?:\.\d+)?%|\$[\d,]+|\d+(?:\.\d+)?\s?(?:k|m|b)\b|\d+\s+(?:hours?|days?|weeks?|months?)|[1-9]\d{2,})/i;
+    /(\d+(?:\.\d+)?%|\$[\d,]+(?:\.\d+)?[MBK]?\b|\d+(?:\.\d+)?\s?(?:k|m|b)\b|\d+\s+(?:hours?|days?|weeks?|months?|years?)|[1-9]\d{2,}|\d+\s*(?:people|users|customers|clients|projects|teams|employees|members|staff|workers))/i;
   return bullets.filter((b) => metricRe.test(b)).slice(0, limit);
 }
 
@@ -657,17 +658,67 @@ ${data.analysis.analysisLists?.overallSummary || "No summary available"}
     [analysisData?.analysis?.pack?.keySkills]
   );
 
-  const resumeBullets = useMemo(
-    () =>
+  const resumeBullets = useMemo(() => {
+    // Try structured pack first
+    let bullets =
       analysisData?.analysis?.pack?.professionalExperience?.flatMap(
         (r) => r.bullets || []
-      ) ?? [],
-    [analysisData?.analysis?.pack?.professionalExperience]
-  );
+      ) ?? [];
 
-  const quantifiedExamples = useMemo(
-    () => extractQuantifiedExamples(resumeBullets, 3),
-    [resumeBullets]
+    // Also include project bullets if available
+    const projectBullets =
+      analysisData?.analysis?.pack?.keyProjects?.flatMap(
+        (p) => p.bullets || []
+      ) ?? [];
+
+    bullets = [...bullets, ...projectBullets];
+
+    // Fallback: extract from parsed analysis text if structured data is empty
+    if (bullets.length === 0 && parsedAnalysis?.professionalExperience) {
+      const expText = parsedAnalysis.professionalExperience;
+      // Extract bullet points from the text (lines starting with - or •)
+      bullets = expText
+        .split("\n")
+        .map((line) => line.replace(/^[\s-•*]+\s*/, "").trim())
+        .filter(
+          (line) =>
+            line.length > 0 && !line.startsWith("**") && !line.includes("—")
+        );
+    }
+
+    console.log("🔍 Resume bullets extraction debug:", {
+      analysisData: analysisData?.analysis?.pack,
+      professionalExperience:
+        analysisData?.analysis?.pack?.professionalExperience,
+      keyProjects: analysisData?.analysis?.pack?.keyProjects,
+      parsedExperience: parsedAnalysis?.professionalExperience,
+      bullets: bullets,
+      bulletsCount: bullets.length,
+      sampleBullets: bullets.slice(0, 3), // Show first 3 bullets for debugging
+    });
+
+    return bullets;
+  }, [
+    analysisData?.analysis?.pack?.professionalExperience,
+    analysisData?.analysis?.pack?.keyProjects,
+    parsedAnalysis?.professionalExperience,
+  ]);
+
+  const quantifiedExamples = useMemo(() => {
+    const examples = extractQuantifiedExamples(resumeBullets, 3);
+    console.log("🔍 Quantified examples extraction debug:", {
+      resumeBullets: resumeBullets,
+      bulletsCount: resumeBullets.length,
+      extractedExamples: examples,
+      examplesCount: examples.length,
+    });
+    return examples;
+  }, [resumeBullets]);
+
+  /* ==== Education items ==== */
+  const educationItems = useMemo(
+    () => analysisData?.analysis?.pack?.educationAndCertification || [],
+    [analysisData?.analysis?.pack?.educationAndCertification]
   );
 
   /* ==== JD keyword analysis ==== */
@@ -959,6 +1010,7 @@ ${data.analysis.analysisLists?.overallSummary || "No summary available"}
               jdMissingRequired={jdMissingRequired}
               jdMissingDesirable={jdMissingDesirable}
               educationGaps={jdEducationGaps}
+              educationItems={educationItems}
             />
           </motion.div>
         </section>

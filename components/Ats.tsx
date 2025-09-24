@@ -1043,6 +1043,13 @@ const ATSBreakdown: React.FC<Props> = ({
                 {b.key === "Education" &&
                   educationFeedback &&
                   (() => {
+                    // Debug logging for education items
+                    console.log("🔍 Education section debug:", {
+                      educationItems: educationItems,
+                      length: educationItems?.length || 0,
+                      hasItems: (educationItems?.length || 0) > 0,
+                    });
+
                     const colorKey = educationFeedback.color as EduColorKey;
                     const C = EDU_COLOR[colorKey];
 
@@ -1217,12 +1224,12 @@ const ATSBreakdown: React.FC<Props> = ({
                                   <span>
                                     {ex
                                       .split(
-                                        /(\$[\d,]+(?:\.\d+)?[MBK]?\b|[\d,]+(?:\.\d+)?[MBK]\b|\d+(?:\.\d+)?%)/i
+                                        /(\d+(?:\.\d+)?%|\$[\d,]+(?:\.\d+)?[MBK]?\b|\d+(?:\.\d+)?\s?(?:k|m|b)\b|\d+\s+(?:hours?|days?|weeks?|months?|years?)|[1-9]\d{2,}|\d+\s*(?:people|users|customers|clients|projects|teams|employees|members|staff|workers))/i
                                       )
                                       .map((part, idx) => {
                                         // Check if this part is a quantifiable result (numbers, percentages, dollar amounts)
                                         if (
-                                          /\$[\d,]+(?:\.\d+)?[MBK]?\b|[\d,]+(?:\.\d+)?[MBK]\b|\d+(?:\.\d+)?%/i.test(
+                                          /(\d+(?:\.\d+)?%|\$[\d,]+(?:\.\d+)?[MBK]?\b|\d+(?:\.\d+)?\s?(?:k|m|b)\b|\d+\s+(?:hours?|days?|weeks?|months?|years?)|[1-9]\d{2,}|\d+\s*(?:people|users|customers|clients|projects|teams|employees|members|staff|workers))/i.test(
                                             part
                                           )
                                         ) {

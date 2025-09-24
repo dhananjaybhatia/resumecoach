@@ -33,7 +33,7 @@ export default function Page() {
         animate={{ opacity: 1, y: 0 }}
         className="mt-16"
       >
-        <SignIn redirectUrl="/resume" signUpUrl="/sign-up" />
+        <SignIn signUpUrl="/sign-up" />
       </motion.div>
 
       {/* Rate Limit Typing Effect Message - Below Clerk Modal */}

@@ -19,7 +19,7 @@ export const anonLimiter = new Ratelimit({
 
 export const userLimiter = new Ratelimit({
     redis,
-    limiter: Ratelimit.slidingWindow(2, '24h'), // 2 scans per day for users
+    limiter: Ratelimit.slidingWindow(20, '24h'), // 2 scans per day for users
     prefix: 'ratelimit:user',
 });
 
@@ -41,20 +41,20 @@ async function getIdentifier() {
         if (userId) return `user:${userId}`;
 
         // Fallback to IP + fingerprint for anonymous users
-        const headersList = headers();
+        const headersList = await headers();
         const ip = headersList.get('x-forwarded-for') || 'unknown';
         const userAgent = headersList.get('user-agent') || '';
 
         return `anon:${ip}:${userAgent.substring(0, 50)}`;
     } catch {
-        const headersList = headers();
+        const headersList = await headers();
         const ip = headersList.get('x-forwarded-for') || 'unknown';
         return `anon:${ip}`;
     }
 }
 
 // Check if user has subscription (simplified)
-async function hasSubscription(userId: string) {
+async function hasSubscription(_userId: string) {
     // Implement your actual subscription check
     return false; // Placeholder
 }
