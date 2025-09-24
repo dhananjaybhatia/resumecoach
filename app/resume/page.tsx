@@ -161,15 +161,16 @@ const ResumePage = () => {
           const errorResult = await response.json();
           console.log("❌ API Error Response:", errorResult);
 
-          // 🆕 HANDLE RATE LIMIT - REDIRECT TO SIGN-IN WITH MESSAGE
+          // 🆕 HANDLE RATE LIMIT - REDIRECT BASED ON AUTH STATUS
           if (response.status === 429) {
             if (!errorResult.isAuthenticated) {
               // Anonymous user hit limit - redirect to sign up with message
               toast.error("You've used your free scan. Sign up for more!");
               router.push("/sign-in?from=rate-limit");
             } else {
-              // Authenticated user hit limit - offer upgrade
-              toast.error("Daily limit reached. Come back tomorrow!");
+              // Authenticated user hit limit - redirect to subscription page
+              toast.error("Daily limit reached. Upgrade your plan for unlimited scans!");
+              router.push("/subscription");
             }
             return;
           }

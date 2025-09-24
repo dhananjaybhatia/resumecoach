@@ -1316,6 +1316,9 @@ export async function POST(request: NextRequest) {
         // Check rate limit AFTER form data parsing
         const rateLimit = await checkRateLimit();
         if (!rateLimit.allowed) {
+            // Redirect authenticated users to subscription page, anonymous users to sign-in
+            const redirectTo = rateLimit.isAuthenticated ? '/subscription' : '/sign-in';
+            
             return NextResponse.json(
                 {
                     error: 'Rate limit exceeded',
@@ -1325,7 +1328,7 @@ export async function POST(request: NextRequest) {
                     isAuthenticated: rateLimit.isAuthenticated,
                     hasSubscription: rateLimit.hasSubscription,
                     requiresAuth: !rateLimit.isAuthenticated,
-                    redirectTo: '/sign-in'
+                    redirectTo: redirectTo
                 },
                 { status: 429, headers: noStoreHeaders() }
             );
