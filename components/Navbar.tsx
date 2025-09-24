@@ -1,6 +1,7 @@
 // components/Navbar.tsx
 import Link from "next/link";
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
+import Navitems from "./Navitems";
 
 const Navbar = () => {
   return (
@@ -17,6 +18,9 @@ const Navbar = () => {
               RESUMECOACH
             </span>
           </Link>
+
+          {/* Navigation Items */}
+          <Navitems />
 
           {/* Clerk Auth */}
           <div className="flex items-center">
