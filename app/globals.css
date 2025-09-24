@@ -87,6 +87,27 @@
 
 body {
   font-family: var(--font-bricolage);
+  overflow-x: hidden; /* Remove horizontal scrollbar */
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Ensure all pages render from top */
+html,
+body {
+  scroll-behavior: auto;
+}
+
+/* Hide scrollbars globally */
+::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 .dark {
@@ -175,44 +196,6 @@ body {
   .btn-signin {
     @apply border border-black rounded-4xl px-4 py-2.5 text-sm font-semibold flex items-center gap-2 cursor-pointer;
   }
-  .companion-list {
-    @apply rounded-4xl border border-black px-7 pt-7 pb-10 max-lg:w-full bg-white;
-  }
-  .companion-limit {
-    @apply items-center justify-center flex flex-col gap-4 w-full min-2xl:w-1/2 pt-20 text-center;
-  }
-
-  .companion-section {
-    @apply border-2 border-orange-500 w-2/3 max-sm:w-full flex flex-col gap-4 justify-center items-center rounded-lg;
-  }
-
-  .companion-avatar {
-    @apply size-[300px] flex items-center justify-center rounded-lg max-sm:size-[100px] mt-4;
-  }
-  .companion-lottie {
-    @apply size-[300px] max-sm:size-[100px];
-  }
-
-  .user-section {
-    @apply flex flex-col gap-4 w-1/3 max-sm:w-full max-sm:flex-row;
-  }
-  .user-avatar {
-    @apply border-2 border-black flex flex-col gap-4 items-center rounded-lg py-8 max-sm:hidden;
-  }
-
-  .btn-mic {
-    @apply border-2 border-black rounded-lg flex flex-col gap-2 items-center py-8 max-sm:py-2 cursor-pointer w-full;
-  }
-
-  .transcript {
-    @apply relative flex flex-col gap-4 w-full items-center pt-10 flex-grow overflow-hidden;
-  }
-  .transcript-message {
-    @apply overflow-y-auto w-full flex flex-col gap-4 max-sm:gap-2 pr-2 h-full text-2xl;
-  }
-  .transcript-fade {
-    @apply pointer-events-none absolute bottom-0 left-0 right-0 h-40 max-sm:h-20 bg-gradient-to-t from-background via-background/90 to-transparent z-10;
-  }
 }
 
 @layer utilities {
@@ -223,4 +206,252 @@ body {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+}
+
+/* Custom Toast Animations with Framer Motion-like effects */
+[data-sonner-toaster][data-theme="light"] [data-sonner-toast] {
+  animation: toastSlideIn 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: top right;
+}
+
+[data-sonner-toaster][data-theme="light"]
+  [data-sonner-toast][data-state="closed"] {
+  animation: toastSlideOut 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes toastSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateX(100%) scale(0.8);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translateX(-5%) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0%) scale(1);
+  }
+}
+
+@keyframes toastSlideOut {
+  0% {
+    opacity: 1;
+    transform: translateX(0%) scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translateX(-5%) scale(1.02);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(100%) scale(0.8);
+  }
+}
+
+/* Progress bar animation */
+[data-sonner-toast]::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.3) 0%,
+    rgba(255, 255, 255, 0.6) 25%,
+    rgba(255, 255, 255, 0.8) 50%,
+    rgba(255, 255, 255, 0.6) 75%,
+    rgba(255, 255, 255, 0.3) 100%
+  );
+  animation: progressBar 5s linear forwards;
+  border-radius: 0 0 2px 2px;
+  box-shadow: 0 1px 3px rgba(255, 255, 255, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(2px);
+}
+
+@keyframes progressBar {
+  0% {
+    width: 100%;
+  }
+  100% {
+    width: 0%;
+  }
+}
+
+/* Type-specific progress bar glass morphism */
+[data-sonner-toast][data-type="success"]::after {
+  background: linear-gradient(
+    90deg,
+    rgba(16, 185, 129, 0.2) 0%,
+    rgba(52, 211, 153, 0.4) 25%,
+    rgba(16, 185, 129, 0.6) 50%,
+    rgba(52, 211, 153, 0.4) 75%,
+    rgba(16, 185, 129, 0.2) 100%
+  ) !important;
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.2),
+    inset 0 1px 0 rgba(16, 185, 129, 0.3) !important;
+}
+
+[data-sonner-toast][data-type="error"]::after {
+  background: linear-gradient(
+    90deg,
+    rgba(239, 68, 68, 0.2) 0%,
+    rgba(248, 113, 113, 0.4) 25%,
+    rgba(239, 68, 68, 0.6) 50%,
+    rgba(248, 113, 113, 0.4) 75%,
+    rgba(239, 68, 68, 0.2) 100%
+  ) !important;
+  box-shadow: 0 1px 3px rgba(239, 68, 68, 0.2),
+    inset 0 1px 0 rgba(239, 68, 68, 0.3) !important;
+}
+
+[data-sonner-toast][data-type="warning"]::after {
+  background: linear-gradient(
+    90deg,
+    rgba(245, 158, 11, 0.2) 0%,
+    rgba(251, 191, 36, 0.4) 25%,
+    rgba(245, 158, 11, 0.6) 50%,
+    rgba(251, 191, 36, 0.4) 75%,
+    rgba(245, 158, 11, 0.2) 100%
+  ) !important;
+  box-shadow: 0 1px 3px rgba(245, 158, 11, 0.2),
+    inset 0 1px 0 rgba(245, 158, 11, 0.3) !important;
+}
+
+[data-sonner-toast][data-type="info"]::after {
+  background: linear-gradient(
+    90deg,
+    rgba(59, 130, 246, 0.2) 0%,
+    rgba(147, 197, 253, 0.4) 25%,
+    rgba(59, 130, 246, 0.6) 50%,
+    rgba(147, 197, 253, 0.4) 75%,
+    rgba(59, 130, 246, 0.2) 100%
+  ) !important;
+  box-shadow: 0 1px 3px rgba(59, 130, 246, 0.2),
+    inset 0 1px 0 rgba(59, 130, 246, 0.3) !important;
+}
+
+/* Hover effects */
+[data-sonner-toast]:hover {
+  transform: translateY(-2px);
+  transition: transform 0.2s ease;
+}
+
+/* Enhanced toast styling with Glass Morphism */
+[data-sonner-toast] {
+  border-radius: 16px !important;
+  background: rgba(255, 255, 255, 0.25) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), 0 4px 16px rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+/* Glass morphism overlay */
+[data-sonner-toast]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(255, 255, 255, 0.05) 50%,
+    rgba(255, 255, 255, 0.1) 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Success toast glass morphism */
+[data-sonner-toast][data-type="success"] {
+  background: linear-gradient(
+    135deg,
+    rgba(16, 185, 129, 0.1) 0%,
+    rgba(5, 150, 105, 0.05) 100%
+  ) !important;
+  border-color: rgba(16, 185, 129, 0.2) !important;
+}
+
+/* Error toast glass morphism */
+[data-sonner-toast][data-type="error"] {
+  background: linear-gradient(
+    135deg,
+    rgba(239, 68, 68, 0.1) 0%,
+    rgba(220, 38, 38, 0.05) 100%
+  ) !important;
+  border-color: rgba(239, 68, 68, 0.2) !important;
+}
+
+/* Warning toast glass morphism */
+[data-sonner-toast][data-type="warning"] {
+  background: linear-gradient(
+    135deg,
+    rgba(245, 158, 11, 0.1) 0%,
+    rgba(217, 119, 6, 0.05) 100%
+  ) !important;
+  border-color: rgba(245, 158, 11, 0.2) !important;
+}
+
+/* Info toast glass morphism */
+[data-sonner-toast][data-type="info"] {
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.1) 0%,
+    rgba(37, 99, 235, 0.05) 100%
+  ) !important;
+  border-color: rgba(59, 130, 246, 0.2) !important;
+}
+
+/* Enhanced hover effects */
+[data-sonner-toast]:hover {
+  transform: translateY(-3px) scale(1.02) !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15), 0 6px 20px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+}
+
+/* Close button styling */
+[data-sonner-toast] [data-close-button] {
+  position: relative !important;
+  z-index: 10 !important;
+  background: rgba(248, 250, 252, 0.95) !important;
+  border-radius: 50% !important;
+  width: 24px !important;
+  height: 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  color: #64748b !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  transition: all 0.2s ease !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-sonner-toast] [data-close-button]:hover {
+  background: rgba(241, 245, 249, 1) !important;
+  color: #475569 !important;
+  transform: scale(1.1) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12) !important;
+}
+
+[data-sonner-toast] [data-close-button]:active {
+  transform: scale(0.95) !important;
+}
+
+/* Ensure close button is visible above glass overlay */
+[data-sonner-toast] [data-close-button] svg {
+  width: 14px !important;
+  height: 14px !important;
+  stroke-width: 2.5 !important;
 }

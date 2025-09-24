@@ -4,10 +4,16 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
-      { hostname: 'img.clerk.com' }
-    ]
-  }
+      { protocol: "https", hostname: "img.clerk.com" }, // add protocol for safety
+    ],
+  },
+
+  // ✅ moved out of `experimental`
+  serverExternalPackages: ["pdf-parse", "mammoth"],
 };
+
+module.exports = nextConfig;
+
 
 export default withSentryConfig(nextConfig, {
   // For all available options, see:

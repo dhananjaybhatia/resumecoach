@@ -2,20 +2,11 @@
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import path from "path";
 
 const navItems = [
   {
-    label: "Home",
-    href: "/",
-  },
-  {
-    label: "Companions",
-    href: "/companions",
-  },
-  {
-    label: "My Journey",
-    href: "/my-journey",
+    label: "Resume",
+    href: "/resume",
   },
 ];
 
