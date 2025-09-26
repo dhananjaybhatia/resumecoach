@@ -294,26 +294,10 @@ function isEducationLine(s: string) {
    Quantified bullet extractor
    ========================= */
 function extractQuantifiedExamples(bullets: string[], limit = 3): string[] {
-  // More specific regex for meaningful quantified achievements (money, percentages, large numbers with impact)
-  const meaningfulMetricsRe =
-    /(\$[\d,]+(?:\.\d+)?[MBK]?\b|\d+(?:\.\d+)?%|\d+(?:\.\d+)?[kmb]\b|\d{4,}|\d+\s+(?:million|billion|thousand)\b)/i;
-
-  const quantifiedExamples = bullets.filter((b) => {
-    // Must contain meaningful metrics
-    if (!meaningfulMetricsRe.test(b)) return false;
-
-    // Exclude experience duration (e.g., "6 years of experience")
-    if (/^\d+\s+years?\s+of\s+experience/i.test(b.trim())) return false;
-
-    // Must be a complete sentence or bullet point (not just a fragment)
-    return (
-      b.trim().length > 20 &&
-      (b.includes(".") || b.includes(";") || b.includes("-"))
-    );
-  });
-
-  // Return complete, meaningful examples without truncation
-  return quantifiedExamples.slice(0, limit);
+  // Enhanced regex to catch more types of quantified achievements
+  const metricRe =
+    /(\d+(?:\.\d+)?%|\$[\d,]+(?:\.\d+)?[MBK]?\b|\d+(?:\.\d+)?\s?(?:k|m|b)\b|\d+\s+(?:hours?|days?|weeks?|months?|years?)|[1-9]\d{2,}|\d+\s*(?:people|users|customers|clients|projects|teams|employees|members|staff|workers))/i;
+  return bullets.filter((b) => metricRe.test(b)).slice(0, limit);
 }
 
 /* =========================
@@ -593,9 +577,6 @@ ${data.analysis.analysisLists?.overallSummary || "No summary available"}
 
   useEffect(() => {
     const raw = localStorage.getItem("resumeAnalysis");
-    console.log("🔍 Raw localStorage content:", raw ? "Found data" : "No data");
-    console.log("🔍 Raw localStorage length:", raw?.length || 0);
-
     if (!raw) {
       console.warn("⚠️ No analysis data found in localStorage");
       setLoading(false);
@@ -604,29 +585,6 @@ ${data.analysis.analysisLists?.overallSummary || "No summary available"}
 
     try {
       const data = JSON.parse(raw) as AnalysisData;
-
-      // Debug: Log the raw data structure
-      console.log("🔍 Raw localStorage data:", data);
-      console.log("🔍 Analysis pack:", data.analysis?.pack);
-      console.log(
-        "🔍 Professional experience:",
-        data.analysis?.pack?.professionalExperience
-      );
-      console.log("🔍 Key projects:", data.analysis?.pack?.keyProjects);
-      console.log(
-        "🔍 Key projects contexts:",
-        data.analysis?.pack?.keyProjects?.map((p) => p.context)
-      );
-
-      // Debug: Check if the data structure is what we expect
-      console.log("🔍 Data structure check:", {
-        hasAnalysis: !!data.analysis,
-        hasPack: !!data.analysis?.pack,
-        hasProfessionalExperience:
-          !!data.analysis?.pack?.professionalExperience,
-        hasKeyProjects: !!data.analysis?.pack?.keyProjects,
-        packKeys: data.analysis?.pack ? Object.keys(data.analysis.pack) : [],
-      });
 
       if (typeof data.analysis?.text === "string") {
         data.analysis.text = data.analysis.text.replace(/\r\n/g, "\n");
@@ -644,7 +602,6 @@ ${data.analysis.analysisLists?.overallSummary || "No summary available"}
       }
 
       setAnalysisData(data);
-      console.log("🔍 Set analysisData to:", data);
 
       if (DEBUG) {
         const ats =
@@ -665,7 +622,6 @@ ${data.analysis.analysisLists?.overallSummary || "No summary available"}
       }
     } catch (e) {
       console.error("❌ Failed to parse localStorage resumeAnalysis:", e);
-      console.error("❌ Raw localStorage data that failed to parse:", raw);
     } finally {
       setLoading(false);
     }
@@ -703,78 +659,48 @@ ${data.analysis.analysisLists?.overallSummary || "No summary available"}
   );
 
   const resumeBullets = useMemo(() => {
-    // Early return if no analysis data
-    if (!analysisData) {
-      console.log("🔍 No analysisData available yet, returning empty array");
-      return [];
-    }
-
-    // Extract ALL text content from the resume for comprehensive quantified example search
-    const allTextContent: string[] = [];
-
-    // 1. Professional Experience bullets
-    const experienceBullets =
+    // Try structured pack first
+    let bullets =
       analysisData?.analysis?.pack?.professionalExperience?.flatMap(
         (r) => r.bullets || []
       ) ?? [];
-    allTextContent.push(...experienceBullets);
 
-    // 2. Project bullets (these contain the quantified examples!)
+    // Also include project bullets if available
     const projectBullets =
       analysisData?.analysis?.pack?.keyProjects?.flatMap(
         (p) => p.bullets || []
       ) ?? [];
-    allTextContent.push(...projectBullets);
 
-    // 3. Project contexts
-    const projectContexts =
-      analysisData?.analysis?.pack?.keyProjects
-        ?.map((p) => p.context || "")
-        .filter(Boolean) ?? [];
-    allTextContent.push(...projectContexts);
+    bullets = [...bullets, ...projectBullets];
 
-    // 4. Professional Summary
-    if (analysisData?.analysis?.pack?.professionalSummary) {
-      allTextContent.push(analysisData.analysis.pack.professionalSummary);
-    }
-
-    // 5. Fallback: extract from parsed analysis text if structured data is empty
-    if (allTextContent.length === 0 && parsedAnalysis?.professionalExperience) {
+    // Fallback: extract from parsed analysis text if structured data is empty
+    if (bullets.length === 0 && parsedAnalysis?.professionalExperience) {
       const expText = parsedAnalysis.professionalExperience;
-      const fallbackBullets = expText
+      // Extract bullet points from the text (lines starting with - or •)
+      bullets = expText
         .split("\n")
         .map((line) => line.replace(/^[\s-•*]+\s*/, "").trim())
         .filter(
           (line) =>
             line.length > 0 && !line.startsWith("**") && !line.includes("—")
         );
-      allTextContent.push(...fallbackBullets);
     }
 
-    console.log("🔍 Comprehensive resume text extraction debug:", {
-      analysisData: analysisData,
-      analysisPack: analysisData?.analysis?.pack,
-      experienceBullets: experienceBullets,
-      projectBullets: projectBullets,
-      projectContexts: projectContexts,
-      professionalSummary: analysisData?.analysis?.pack?.professionalSummary,
-      allTextContent: allTextContent,
-      totalContentCount: allTextContent.length,
-      sampleContent: allTextContent.slice(0, 5), // Show first 5 items for debugging
-      keyProjectsData: analysisData?.analysis?.pack?.keyProjects?.map((p) => ({
-        name: p.name,
-        context: p.context,
-        bullets: p.bullets,
-        bulletsCount: p.bullets?.length || 0,
-      })),
+    console.log("🔍 Resume bullets extraction debug:", {
+      analysisData: analysisData?.analysis?.pack,
+      professionalExperience:
+        analysisData?.analysis?.pack?.professionalExperience,
+      keyProjects: analysisData?.analysis?.pack?.keyProjects,
+      parsedExperience: parsedAnalysis?.professionalExperience,
+      bullets: bullets,
+      bulletsCount: bullets.length,
+      sampleBullets: bullets.slice(0, 3), // Show first 3 bullets for debugging
     });
 
-    return allTextContent;
+    return bullets;
   }, [
-    analysisData,
     analysisData?.analysis?.pack?.professionalExperience,
     analysisData?.analysis?.pack?.keyProjects,
-    analysisData?.analysis?.pack?.professionalSummary,
     parsedAnalysis?.professionalExperience,
   ]);
 

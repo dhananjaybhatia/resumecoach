@@ -38,9 +38,9 @@ const Navitems = ({ mobile = false }: NavitemsProps) => {
           href={href}
           key={label}
           className={cn(
-            "transition-colors hover:text-orange-500",
+            "text-gray-800 transition-colors hover:text-orange-500",
             mounted && pathName === href && "text-orange-500 font-semibold",
-            mobile ? "text-lg py-2 px-3 rounded-lg hover:bg-orange-50" : ""
+            mobile ? "text-lg py-2 px-3 rounded-lg hover:bg-white/10" : ""
           )}
         >
           {label}

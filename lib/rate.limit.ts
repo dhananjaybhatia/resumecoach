@@ -13,7 +13,7 @@ const redis = new Redis({
 // Create different rate limiters
 export const anonLimiter = new Ratelimit({
     redis,
-    limiter: Ratelimit.slidingWindow(1, '24h'), // 1 scan per day for anonymous
+    limiter: Ratelimit.slidingWindow(5, '24h'), // 1 scan per day for anonymous
     prefix: 'ratelimit:anon',
 });
 
@@ -29,7 +29,7 @@ export const subscriptionLimiter = new Ratelimit({
 });
 export const gentleMinuteLimiter = new Ratelimit({
     redis,
-    limiter: Ratelimit.slidingWindow(3, '60s'),
+    limiter: Ratelimit.slidingWindow(10, '60s'), // Allow 10 requests per minute to handle retries and page loads
     prefix: 'ratelimit:gentle:minute',
 });
 
@@ -76,38 +76,39 @@ async function hasSubscription() {
 export async function checkRateLimit() {
     const identifier = await getIdentifier();
 
-    // ✅ Add gentle minute-level limiting FIRST
-    const minuteResult = await gentleMinuteLimiter.limit(identifier);
-    if (!minuteResult.success) {
-        return {
-            allowed: false,
-            message: "Please wait a moment between scans",
-            reset: minuteResult.reset,
-            remaining: 0,
-            isAuthenticated: false, // We don't know auth status yet
-            hasSubscription: false
-        };
-    }
-
     try {
         const { userId } = await auth();
 
         if (userId) {
+            // Signed-in user logic
             const isSubscribed = await hasSubscription();
-            const limiter = isSubscribed ? subscriptionLimiter : userLimiter;
-            const result = await limiter.limit(identifier);
 
-            return {
-                allowed: result.success,
-                limit: isSubscribed ? 1000 : 1, // 1 free scan or unlimited for subscribers
-                remaining: result.remaining,
-                reset: result.reset,
-                isAuthenticated: true,
-                hasSubscription: isSubscribed
-            };
+            if (isSubscribed) {
+                // Subscribed user - unlimited scans
+                const result = await subscriptionLimiter.limit(identifier);
+                return {
+                    allowed: result.success,
+                    limit: 1000,
+                    remaining: result.remaining,
+                    reset: result.reset,
+                    isAuthenticated: true,
+                    hasSubscription: true
+                };
+            } else {
+                // Signed-in but not subscribed - 2 free scans per day
+                const result = await userLimiter.limit(identifier);
+                return {
+                    allowed: result.success,
+                    limit: 2,
+                    remaining: result.remaining,
+                    reset: result.reset,
+                    isAuthenticated: true,
+                    hasSubscription: false
+                };
+            }
         }
 
-        // Anonymous user
+        // Anonymous user - 1 free scan per day
         const result = await anonLimiter.limit(identifier);
         return {
             allowed: result.success,

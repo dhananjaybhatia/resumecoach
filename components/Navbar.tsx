@@ -15,7 +15,7 @@ const Navbar = () => {
 
   return (
     <header className="relative z-50 w-full">
-      <div className="mx-auto max-w-screen-xl px-3 sm:px-6 lg:px-8 pt-2 sm:pt-3">
+      <div className="mx-auto max-w-screen-xl px-3 sm:px-6 lg:px-8 pt-2 sm:pt-3 ">
         <nav
           className="flex items-center justify-between gap-3
                      bg-white/90 backdrop-blur rounded-full border border-gray-300

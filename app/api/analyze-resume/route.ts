@@ -1338,24 +1338,36 @@ export async function POST(request: NextRequest) {
         // Check rate limit FIRST - before any processing
         const rateLimit = await checkRateLimit();
         if (!rateLimit.allowed) {
-            // Redirect authenticated users to subscription page, anonymous users to sign-in
-            const redirectTo = rateLimit.isAuthenticated ? '/subscription' : '/sign-in';
+            // Determine redirect based on user type and usage
+            let redirectTo, message;
+
+            if (rateLimit.isAuthenticated) {
+                if (rateLimit.hasSubscription) {
+                    // Subscribed user hit limit (shouldn't happen with 1000 limit)
+                    redirectTo = '/subscription';
+                    message = 'You have reached your scan limit for today. Please try again tomorrow.';
+                } else {
+                    // Signed-in user used their 2 free scans - redirect to subscription
+                    redirectTo = '/subscription';
+                    message = 'You have used your 2 free scans for today. Subscribe for unlimited scans or try again tomorrow.';
+                }
+            } else {
+                // Anonymous user used their 1 free scan - redirect to sign-in
+                redirectTo = '/sign-in';
+                message = 'You have used your 1 free scan for today. Sign up for 2 free scans daily, or wait 24 hours.';
+            }
 
             return NextResponse.json(
                 {
                     error: 'Rate limit exceeded',
-                    message: rateLimit.isAuthenticated
-                        ? rateLimit.hasSubscription
-                            ? 'You have reached your scan limit for today. Please try again tomorrow.'
-                            : 'You have used your free scan for today. Subscribe for unlimited scans or try again tomorrow.'
-                        : 'You have used your free scan for today. Sign in for 1 free scan daily, or wait 24 hours.',
+                    message: message,
                     reset: rateLimit.reset,
                     remaining: rateLimit.remaining,
                     isAuthenticated: rateLimit.isAuthenticated,
                     hasSubscription: rateLimit.hasSubscription,
                     requiresAuth: !rateLimit.isAuthenticated,
                     redirectTo: redirectTo,
-                    nextFreeScan: !rateLimit.isAuthenticated ? new Date(rateLimit.reset).toISOString() : null
+                    nextFreeScan: new Date(rateLimit.reset).toISOString()
                 },
                 { status: 429, headers: noStoreHeaders() }
             );
@@ -1380,8 +1392,19 @@ export async function POST(request: NextRequest) {
         if (!file) {
             return NextResponse.json({ error: "No resume file provided" }, { status: 400, headers: noStoreHeaders() });
         }
-        if (jobDescription.trim().length < 20) {
+        if (jobDescription.trim().length < 50) {
             return NextResponse.json({ error: "Valid job/position description is required" }, { status: 400, headers: noStoreHeaders() });
+        }
+
+        const meaningfulWords = jobDescription.trim().split(/\s+/).filter(word =>
+            word.length > 3 && /[a-zA-Z]/.test(word)
+        ).length;
+
+        if (meaningfulWords < 5) {
+            return NextResponse.json({
+                error: "Invalid job description",
+                message: "Please provide a meaningful job description with actual content"
+            }, { status: 400 });
         }
 
         const { text: resumeText, sections } = await extractTextFromFile(file);

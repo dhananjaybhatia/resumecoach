@@ -32,7 +32,14 @@ const resumeFormSchema = z.object({
   state: z.string().min(1, "State/Province is required"),
   jobDescription: z
     .string()
-    .min(10, "Job description must be at least 10 characters"),
+    .min(50, "Job description must be at least 50 characters") // ← Change from 10 to 50
+    .refine((desc) => {
+      const words = desc
+        .trim()
+        .split(/\s+/)
+        .filter((word) => word.length > 3 && /[a-zA-Z]/.test(word));
+      return words.length >= 5;
+    }, "Job description must contain meaningful content"), // ← Add content validation
   resume: z
     .any()
     .refine((file) => !file || isFile(file), "Please upload a file")
@@ -123,9 +130,42 @@ const ResumePage = () => {
         return;
       }
 
-      setStatusText("Uploading your file..."); // Initial status
+      // === ADD JD VALIDATION HERE ===
+      const jobDescription = data.jobDescription.trim();
 
-      // Set up status timer - updates every 15 seconds
+      // Check minimum length
+      if (jobDescription.length < 50) {
+        toast.error("Job description must be at least 50 characters long.");
+        return;
+      }
+
+      // Check for meaningful content (not just random characters)
+      const words = jobDescription
+        .split(/\s+/)
+        .filter((word) => word.length > 3 && /[a-zA-Z]/.test(word));
+
+      if (words.length < 5) {
+        toast.error(
+          "Please provide a meaningful job description with actual content."
+        );
+        return;
+      }
+
+      // Check if it's mostly gibberish
+      const wordRatio =
+        jobDescription.replace(/[^a-zA-Z\s]/g, "").length /
+        jobDescription.length;
+      if (wordRatio < 0.6) {
+        toast.error(
+          "Job description appears to contain too many random characters. Please provide a real job description."
+        );
+        return;
+      }
+      // === END JD VALIDATION ===
+
+      setStatusText("Uploading your file...");
+
+      // ... rest of your existing timer and API call code
       const statusStages = [
         "Uploading your file...",
         "Preparing data for analysis...",
@@ -133,14 +173,13 @@ const ResumePage = () => {
         "Finalising results...",
       ];
 
-      // Create new timers
       const newStatusTimers = statusStages.map((stage, index) => {
         return setTimeout(() => {
           setStatusText(stage);
-        }, (index + 1) * 8000); // 15s, 30s, 45s, 60s
+        }, (index + 1) * 8000);
       });
 
-      setStatusTimers(newStatusTimers); // Store timers for cleanup
+      setStatusTimers(newStatusTimers);
 
       const formData = new FormData();
       formData.append("resume", uploadedFile, uploadedFile.name);
@@ -148,7 +187,7 @@ const ResumePage = () => {
       formData.append("jobTitle", data.jobTitle);
       formData.append("country", data.country);
       formData.append("state", data.state);
-      formData.append("jobDescription", data.jobDescription);
+      formData.append("jobDescription", jobDescription); // Use the trimmed version
 
       const response = await fetch("/api/analyze-resume", {
         method: "POST",
@@ -204,9 +243,10 @@ const ResumePage = () => {
           return;
         } finally {
           setStatusText("");
-          // Clear all timers when done
-          statusTimers.forEach((timer) => clearTimeout(timer));
+          // FIXED: Clear timers correctly
+          const currentTimers = [...statusTimers];
           setStatusTimers([]);
+          currentTimers.forEach((timer) => clearTimeout(timer));
         }
       }
 
@@ -265,6 +305,10 @@ const ResumePage = () => {
         toast.success(
           `Analysis Complete! ATS Score: ${displayAtsScore}/100 | Match Score: ${displayMatchScore}/100`
         );
+        console.log("🔍 About to navigate to /results", {
+          resultSuccess: result.success,
+          hasLocalStorage: typeof localStorage !== "undefined",
+        });
 
         // Store data in localStorage and navigate to results
         localStorage.setItem("resumeAnalysis", JSON.stringify(result));

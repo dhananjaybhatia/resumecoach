@@ -6,6 +6,7 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 // Define public routes that don't need authentication
 const isPublicRoute = createRouteMatcher([
     '/',
+    '/results',
     '/resume', // Resume upload page - accessible to anonymous users
     '/subscription', // Subscription page - accessible to anonymous users
     '/sign-in(.*)', // Clerk sign-in page and all its sub-routes
