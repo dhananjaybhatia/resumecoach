@@ -1224,19 +1224,17 @@ const ATSBreakdown: React.FC<Props> = ({
                                   <span>
                                     {ex
                                       .split(
-                                        /(\d+(?:\.\d+)?%|\$[\d,]+(?:\.\d+)?[MBK]?\b|\d+(?:\.\d+)?\s?(?:k|m|b)\b|\d+\s+(?:hours?|days?|weeks?|months?|years?)|[1-9]\d{2,}|\d+\s*(?:people|users|customers|clients|projects|teams|employees|members|staff|workers))/i
+                                        /(\$[\d,]+(?:\.\d+)?[MBK]?\b|\d+(?:\.\d+)?%|\d+(?:\.\d+)?[kmb]\b|\d{4,}|\d+\s+(?:million|billion|thousand)\b)/i
                                       )
                                       .map((part, idx) => {
-                                        // Check if this part is a quantifiable result (numbers, percentages, dollar amounts)
-                                        if (
-                                          /(\d+(?:\.\d+)?%|\$[\d,]+(?:\.\d+)?[MBK]?\b|\d+(?:\.\d+)?\s?(?:k|m|b)\b|\d+\s+(?:hours?|days?|weeks?|months?|years?)|[1-9]\d{2,}|\d+\s*(?:people|users|customers|clients|projects|teams|employees|members|staff|workers))/i.test(
-                                            part
-                                          )
-                                        ) {
+                                        // Check if this part is a meaningful quantified result
+                                        const isQuantified = /(\$[\d,]+(?:\.\d+)?[MBK]?\b|\d+(?:\.\d+)?%|\d+(?:\.\d+)?[kmb]\b|\d{4,}|\d+\s+(?:million|billion|thousand)\b)/i.test(part);
+                                        
+                                        if (isQuantified) {
                                           return (
                                             <strong
                                               key={idx}
-                                              className="font-semibold text-gray-900"
+                                              className="font-semibold text-gray-900 bg-yellow-100 px-1 rounded"
                                             >
                                               {part}
                                             </strong>

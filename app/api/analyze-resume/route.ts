@@ -563,9 +563,21 @@ function extractNounPhrases(jd: string): string[] {
 
 // Build the JD dictionary dynamically, with optional extras from ENV
 function buildJDDictionary(jd: string): string[] {
+    const triggeredLists = extractTriggeredLists(jd);
+    const nounPhrases = extractNounPhrases(jd);
+
+    console.log("🔍 buildJDDictionary debug:", {
+        jdLength: jd.length,
+        jdPreview: jd.substring(0, 200) + "...",
+        triggeredListsCount: triggeredLists.length,
+        nounPhrasesCount: nounPhrases.length,
+        triggeredLists: triggeredLists.slice(0, 5),
+        nounPhrases: nounPhrases.slice(0, 5)
+    });
+
     const raw = [
-        ...extractTriggeredLists(jd),
-        ...extractNounPhrases(jd),
+        ...triggeredLists,
+        ...nounPhrases,
     ];
 
     // Optional extras via env (JSON array string), e.g. '["Cognos","ThoughtSpot"]'
@@ -611,7 +623,17 @@ function buildJDDictionary(jd: string): string[] {
     });
 
     // Cap to avoid overweighting very long JDs
-    return cleaned.slice(0, 60);
+    const final = cleaned.slice(0, 60);
+
+    console.log("🔍 buildJDDictionary final result:", {
+        rawCount: raw.length,
+        dictCount: dict.length,
+        filteredCount: filtered.length,
+        finalCount: final.length,
+        finalKeywords: final.slice(0, 10)
+    });
+
+    return final;
 }
 
 // Normalised presence test with flexible variants + regex word boundaries
@@ -713,6 +735,14 @@ async function semanticPartialHit(openaiClient: OpenAI, cvText: string, token: s
 
 export function computeKeywordMatch(jd: string, cv: string): KeywordMatch {
     let DICT = buildJDDictionary(jd);
+
+    // Debug logging
+    console.log("🔍 Keyword extraction debug:", {
+        jdLength: jd.length,
+        jdPreview: jd.substring(0, 200) + "...",
+        dictLength: DICT.length,
+        dictContent: DICT.slice(0, 10) // Show first 10 keywords
+    });
 
     const matched: string[] = [];
     const missing: string[] = [];
@@ -1305,6 +1335,33 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
     try {
+        // Check rate limit FIRST - before any processing
+        const rateLimit = await checkRateLimit();
+        if (!rateLimit.allowed) {
+            // Redirect authenticated users to subscription page, anonymous users to sign-in
+            const redirectTo = rateLimit.isAuthenticated ? '/subscription' : '/sign-in';
+
+            return NextResponse.json(
+                {
+                    error: 'Rate limit exceeded',
+                    message: rateLimit.isAuthenticated
+                        ? rateLimit.hasSubscription
+                            ? 'You have reached your scan limit for today. Please try again tomorrow.'
+                            : 'You have used your free scan for today. Subscribe for unlimited scans or try again tomorrow.'
+                        : 'You have used your free scan for today. Sign in for 1 free scan daily, or wait 24 hours.',
+                    reset: rateLimit.reset,
+                    remaining: rateLimit.remaining,
+                    isAuthenticated: rateLimit.isAuthenticated,
+                    hasSubscription: rateLimit.hasSubscription,
+                    requiresAuth: !rateLimit.isAuthenticated,
+                    redirectTo: redirectTo,
+                    nextFreeScan: !rateLimit.isAuthenticated ? new Date(rateLimit.reset).toISOString() : null
+                },
+                { status: 429, headers: noStoreHeaders() }
+            );
+        }
+
+        // Only parse form data if rate limit check passes
         const formData = await request.formData();
         const file = formData.get("resume") as unknown as File | null;
         const jobDescription = String(formData.get("jobDescription") || "");
@@ -1313,26 +1370,12 @@ export async function POST(request: NextRequest) {
         const country = String(formData.get("country") || "");
         const state = String(formData.get("state") || "");
 
-        // Check rate limit AFTER form data parsing
-        const rateLimit = await checkRateLimit();
-        if (!rateLimit.allowed) {
-            // Redirect authenticated users to subscription page, anonymous users to sign-in
-            const redirectTo = rateLimit.isAuthenticated ? '/subscription' : '/sign-in';
-            
-            return NextResponse.json(
-                {
-                    error: 'Rate limit exceeded',
-                    message: `You've used all your available scans. ${rateLimit.isAuthenticated ? '2 free scans per day for signed-in users.' : '1 free scan per day for anonymous users.'}`,
-                    reset: rateLimit.reset,
-                    remaining: rateLimit.remaining,
-                    isAuthenticated: rateLimit.isAuthenticated,
-                    hasSubscription: rateLimit.hasSubscription,
-                    requiresAuth: !rateLimit.isAuthenticated,
-                    redirectTo: redirectTo
-                },
-                { status: 429, headers: noStoreHeaders() }
-            );
-        }
+        // Debug logging for job description
+        console.log("🔍 Job description received:", {
+            length: jobDescription.length,
+            preview: jobDescription.substring(0, 300) + "...",
+            hasContent: jobDescription.trim().length > 0
+        });
 
         if (!file) {
             return NextResponse.json({ error: "No resume file provided" }, { status: 400, headers: noStoreHeaders() });

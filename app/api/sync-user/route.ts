@@ -99,7 +99,12 @@ export async function POST(request: NextRequest) {
         if (error) {
             console.error("Database error:", error);
             return NextResponse.json(
-                { error: "Database error", details: error.message },
+                {
+                    error: "Database error",
+                    details: error.message,
+                    code: error.code,
+                    hint: error.hint
+                },
                 { status: 500 }
             );
         }

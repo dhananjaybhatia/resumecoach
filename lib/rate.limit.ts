@@ -19,13 +19,12 @@ export const anonLimiter = new Ratelimit({
 
 export const userLimiter = new Ratelimit({
     redis,
-    limiter: Ratelimit.slidingWindow(20, '24h'), // 2 scans per day for users
+    limiter: Ratelimit.slidingWindow(2, '24h'), // 2 free scans per day for signed-in users
     prefix: 'ratelimit:user',
 });
-
 export const subscriptionLimiter = new Ratelimit({
     redis,
-    limiter: Ratelimit.slidingWindow(50, '24h'), // Essentially unlimited for subscribers
+    limiter: Ratelimit.slidingWindow(1000, '24h'), // Unlimited scans for subscribers
     prefix: 'ratelimit:sub',
 });
 export const gentleMinuteLimiter = new Ratelimit({
@@ -40,23 +39,37 @@ async function getIdentifier() {
         const { userId } = await auth();
         if (userId) return `user:${userId}`;
 
-        // Fallback to IP + fingerprint for anonymous users
+        // For anonymous users, use IP + User-Agent for better tracking
         const headersList = await headers();
-        const ip = headersList.get('x-forwarded-for') || 'unknown';
-        const userAgent = headersList.get('user-agent') || '';
+        const ip = headersList.get('x-forwarded-for') ||
+            headersList.get('x-real-ip') ||
+            headersList.get('cf-connecting-ip') ||
+            'unknown';
+        const userAgent = headersList.get('user-agent') || 'unknown';
 
-        return `anon:${ip}:${userAgent.substring(0, 50)}`;
+        // Create a more stable identifier for anonymous users
+        // Use first part of IP and first 30 chars of user agent
+        const cleanIp = ip.split(',')[0].trim();
+        const cleanUserAgent = userAgent.substring(0, 30).replace(/[^a-zA-Z0-9]/g, '');
+
+        return `anon:${cleanIp}:${cleanUserAgent}`;
     } catch {
         const headersList = await headers();
         const ip = headersList.get('x-forwarded-for') || 'unknown';
-        return `anon:${ip}`;
+        return `anon:${ip.split(',')[0].trim()}`;
     }
 }
 
-// Check if user has subscription (simplified)
-async function hasSubscription(_userId: string) {
-    // Implement your actual subscription check
-    return false; // Placeholder
+// Check if user has subscription using Clerk's access control
+async function hasSubscription() {
+    try {
+        const { has } = await auth();
+        // Check if user has the 'unlimited_scans' feature
+        return has({ feature: 'unlimited_scans' });
+    } catch (error) {
+        console.error('Error checking subscription:', error);
+        return false;
+    }
 }
 
 // Main rate limit check
@@ -80,13 +93,13 @@ export async function checkRateLimit() {
         const { userId } = await auth();
 
         if (userId) {
-            const isSubscribed = await hasSubscription(userId);
+            const isSubscribed = await hasSubscription();
             const limiter = isSubscribed ? subscriptionLimiter : userLimiter;
             const result = await limiter.limit(identifier);
 
             return {
                 allowed: result.success,
-                limit: isSubscribed ? 50 : 2, // Changed from Infinity to 50
+                limit: isSubscribed ? 1000 : 1, // 1 free scan or unlimited for subscribers
                 remaining: result.remaining,
                 reset: result.reset,
                 isAuthenticated: true,

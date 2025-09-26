@@ -164,12 +164,14 @@ const ResumePage = () => {
           // 🆕 HANDLE RATE LIMIT - REDIRECT BASED ON AUTH STATUS
           if (response.status === 429) {
             if (!errorResult.isAuthenticated) {
-              // Anonymous user hit limit - redirect to sign up with message
+              // Anonymous user hit limit - redirect to sign in page
               toast.error("You've used your free scan. Sign up for more!");
               router.push("/sign-in?from=rate-limit");
             } else {
               // Authenticated user hit limit - redirect to subscription page
-              toast.error("Daily limit reached. Upgrade your plan for unlimited scans!");
+              toast.error(
+                "Daily limit reached. Upgrade your plan for unlimited scans!"
+              );
               router.push("/subscription");
             }
             return;
@@ -245,7 +247,6 @@ const ResumePage = () => {
         } else {
           // Backend returned structured analysis
           console.log("📊 Structured Analysis:", result.analysis);
-          localStorage.setItem("resumeAnalysis", JSON.stringify(result));
         }
 
         // Store resume info
@@ -254,7 +255,6 @@ const ResumePage = () => {
           type: uploadedFile.type,
           size: uploadedFile.size,
         };
-        localStorage.setItem("resumeInfo", JSON.stringify(resumeInfo));
 
         // Show success message with scores
         const displayAtsScore =
@@ -265,6 +265,10 @@ const ResumePage = () => {
         toast.success(
           `Analysis Complete! ATS Score: ${displayAtsScore}/100 | Match Score: ${displayMatchScore}/100`
         );
+
+        // Store data in localStorage and navigate to results
+        localStorage.setItem("resumeAnalysis", JSON.stringify(result));
+        localStorage.setItem("resumeInfo", JSON.stringify(resumeInfo));
 
         router.push("/results");
       } else {
