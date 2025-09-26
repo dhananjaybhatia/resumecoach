@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 
 const Subscription = () => {
   const fullText =
-    "You're out of free scans. Skip the 24h wait—unlock unlimited and stay ahead";
+    "Two free scans daily. Skip the 24h wait—unlock unlimited and stay ahead";
   const typingText = "while you wait, someone else applies";
 
   const [currentText, setCurrentText] = useState("");
@@ -50,7 +50,7 @@ const Subscription = () => {
         <div className="mt-16 text-center">
           {/* Typing animation with ticker */}
           <motion.h1
-            className="text-2xl sm:text-5xl md:text-4xl font-bold text-gray-800 mb-8"
+            className="text-2xl sm:text-5xl md:text-4xl font-bold text-gray-800 mb-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5 }}
