@@ -13,7 +13,7 @@ const redis = new Redis({
 // Create different rate limiters
 export const anonLimiter = new Ratelimit({
     redis,
-    limiter: Ratelimit.slidingWindow(5, '24h'), // 1 scan per day for anonymous
+    limiter: Ratelimit.slidingWindow(1, '24h'), // 1 scan per day for anonymous
     prefix: 'ratelimit:anon',
 });
 
