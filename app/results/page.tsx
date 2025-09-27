@@ -287,10 +287,22 @@ function isEducationLine(s: string) {
    Quantified bullet extractor
    ========================= */
 function extractQuantifiedExamples(bullets: string[], limit = 3): string[] {
-  // Enhanced regex to catch more types of quantified achievements
-  const metricRe =
-    /(\d+(?:\.\d+)?%|\$[\d,]+(?:\.\d+)?[MBK]?\b|\d+(?:\.\d+)?\s?(?:k|m|b)\b|\d+\s+(?:hours?|days?|weeks?|months?|years?)|[1-9]\d{2,}|\d+\s*(?:people|users|customers|clients|projects|teams|employees|members|staff|workers))/i;
-  return bullets.filter((b) => metricRe.test(b)).slice(0, limit);
+  // Enhanced regex patterns for quantified achievements
+  const patterns = [
+    // For percentages
+    /(\d+%|\d+\.\d+%|\d+\s*percent)/i,
+    // For currency
+    /\$\d+[KM]?|\d+[KM]?\s*(dollars|USD)/i,
+    // For other metrics
+    /\d+\s*(years?|months?|days?|hours?|people|team members?|clients?|projects?)/i
+  ];
+  
+  // Check if any pattern matches
+  const hasQuantifiedMetrics = (text: string) => {
+    return patterns.some(pattern => pattern.test(text));
+  };
+  
+  return bullets.filter(hasQuantifiedMetrics).slice(0, limit);
 }
 
 /* =========================

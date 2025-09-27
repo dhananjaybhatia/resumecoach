@@ -1225,11 +1225,11 @@ const ATSBreakdown: React.FC<Props> = ({
                                   <span>
                                     {ex
                                       .split(
-                                        /(\$[\d,]+(?:\.\d+)?[MBK]?\b|\d+(?:\.\d+)?%|\d+(?:\.\d+)?[kmb]\b|\d{4,}|\d+\s+(?:million|billion|thousand)\b)/i
+                                        /(\d+%|\d+\.\d+%|\d+\s*percent|\$\d+[KM]?|\d+[KM]?\s*(dollars|USD)|\d+\s*(years?|months?|days?|hours?|people|team members?|clients?|projects?))/i
                                       )
                                       .map((part, idx) => {
                                         // Check if this part is a meaningful quantified result
-                                        const isQuantified = /(\$[\d,]+(?:\.\d+)?[MBK]?\b|\d+(?:\.\d+)?%|\d+(?:\.\d+)?[kmb]\b|\d{4,}|\d+\s+(?:million|billion|thousand)\b)/i.test(part);
+                                        const isQuantified = /(\d+%|\d+\.\d+%|\d+\s*percent|\$\d+[KM]?|\d+[KM]?\s*(dollars|USD)|\d+\s*(years?|months?|days?|hours?|people|team members?|clients?|projects?))/i.test(part);
                                         
                                         if (isQuantified) {
                                           return (
