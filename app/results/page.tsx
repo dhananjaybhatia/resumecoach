@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import ResumeAnalysisPDF from "../../components/ResumeAnalysisPDF";
 import { pdf } from "@react-pdf/renderer";
 import { debug, debugOnce } from "@/lib/debug";
+import { isQuantified } from "@/lib/isQuantified";
 
 /* =========================
    Build fingerprint
@@ -133,6 +134,7 @@ interface AnalysisData {
       jobTitle?: string;
     };
   };
+  quantifiedExamples?: string[];
   message: string;
 }
 
@@ -246,6 +248,37 @@ function clamp100(n: number) {
   return Math.max(0, Math.min(100, Math.round(n)));
 }
 
+// put this once and reuse everywhere (ResultsPage + ATSBreakdown)
+// const isQuantified = (s: string) => {
+//   const t = (s || "").toLowerCase();
+//   return (
+//     /\b\d+(?:\.\d+)?\s*%/.test(t) || // 12%
+//     /\b\d+\s*percent\b/.test(t) || // 12 percent
+//     /(?:\$|usd|€|£|₹|¥)\s?\d[\d,]*(?:\.\d+)?\s*(k|m|b|million|billion)?\b/.test(
+//       t
+//     ) ||
+//     /\b\d[\d,]*(?:\.\d+)?\s*(years?|months?|weeks?|days?|hours?|people|employees?|team(?:\s?members?)?|clients?|customers?|projects?|tickets?|leads?|users?)\b/.test(
+//       t
+//     ) ||
+//     /\b(increased|decreased|reduced|grew|boosted|cut|saved|improved)\b.*\b\d[\d,]*(?:\.\d+)?\b/.test(
+//       t
+//     ) ||
+//     /\b\d+(?:\.\d+)?\s*(x|×)\b/.test(t) || // 3x
+//     /\b\d[\d,]*\+\b/.test(t) || // 200+
+//     /\b\d+(?:\.\d+)?\s*points?\b/.test(t) // 28 points (e.g., NPS)
+//   );
+// };
+
+const uniq = (arr: string[]) => {
+  const seen = new Set<string>();
+  return arr.filter((x) => {
+    const k = x.trim().toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+};
+
 function normalizeJDItems(items: string[]): string[] {
   const out: string[] = [];
   let buf: string[] = [];
@@ -294,14 +327,14 @@ function extractQuantifiedExamples(bullets: string[], limit = 3): string[] {
     // For currency
     /\$\d+[KM]?|\d+[KM]?\s*(dollars|USD)/i,
     // For other metrics
-    /\d+\s*(years?|months?|days?|hours?|people|team members?|clients?|projects?)/i
+    /\d+\s*(years?|months?|days?|hours?|people|team members?|clients?|projects?)/i,
   ];
-  
+
   // Check if any pattern matches
   const hasQuantifiedMetrics = (text: string) => {
-    return patterns.some(pattern => pattern.test(text));
+    return patterns.some((pattern) => pattern.test(text));
   };
-  
+
   return bullets.filter(hasQuantifiedMetrics).slice(0, limit);
 }
 
@@ -582,6 +615,14 @@ ${data.analysis.analysisLists?.overallSummary || "No summary available"}
 
   useEffect(() => {
     const raw = localStorage.getItem("resumeAnalysis");
+    debug("🔍 localStorage debug:", {
+      raw: raw ? raw.substring(0, 200) + "..." : null,
+      hasRaw: !!raw,
+      localStorageKeys: Object.keys(localStorage),
+      resumeAnalysisExists: !!localStorage.getItem("resumeAnalysis"),
+      resumeAnalysisSize: localStorage.getItem("resumeAnalysis")?.length || 0,
+    });
+
     if (!raw) {
       console.warn("⚠️ No analysis data found in localStorage");
       setLoading(false);
@@ -590,6 +631,19 @@ ${data.analysis.analysisLists?.overallSummary || "No summary available"}
 
     try {
       const data = JSON.parse(raw) as AnalysisData;
+      debug("🔍 Parsed analysis data:", {
+        hasAnalysis: !!data.analysis,
+        hasPack: !!data.analysis?.pack,
+        hasProfessionalExperience:
+          !!data.analysis?.pack?.professionalExperience,
+        packExperienceLength:
+          data.analysis?.pack?.professionalExperience?.length || 0,
+        packExperienceSample:
+          data.analysis?.pack?.professionalExperience?.slice(0, 1),
+        hasQuantifiedExamples: !!data.quantifiedExamples,
+        quantifiedExamplesCount: data.quantifiedExamples?.length || 0,
+        quantifiedExamplesSample: data.quantifiedExamples?.slice(0, 1),
+      });
 
       if (typeof data.analysis?.text === "string") {
         data.analysis.text = data.analysis.text.replace(/\r\n/g, "\n");
@@ -607,6 +661,14 @@ ${data.analysis.analysisLists?.overallSummary || "No summary available"}
       }
 
       setAnalysisData(data);
+      debug("🔍 Analysis data set:", {
+        hasAnalysis: !!data.analysis,
+        hasPack: !!data.analysis?.pack,
+        hasProfessionalExperience:
+          !!data.analysis?.pack?.professionalExperience,
+        packExperienceLength:
+          data.analysis?.pack?.professionalExperience?.length || 0,
+      });
 
       if (DEBUG) {
         const ats =
@@ -663,58 +725,100 @@ ${data.analysis.analysisLists?.overallSummary || "No summary available"}
     [analysisData?.analysis?.pack?.keySkills]
   );
 
+  // In Results page where you build `resumeBullets`:
   const resumeBullets = useMemo(() => {
-    // Try structured pack first
+    if (!analysisData) return [];
+
+    // 1) what you already have
     let bullets =
-      analysisData?.analysis?.pack?.professionalExperience?.flatMap(
+      analysisData.analysis?.pack?.professionalExperience?.flatMap(
         (r) => r.bullets || []
       ) ?? [];
-
-    // Also include project bullets if available
     const projectBullets =
-      analysisData?.analysis?.pack?.keyProjects?.flatMap(
+      analysisData.analysis?.pack?.keyProjects?.flatMap(
         (p) => p.bullets || []
       ) ?? [];
-
     bullets = [...bullets, ...projectBullets];
 
-    // Fallback: extract from parsed analysis text if structured data is empty
-    if (bullets.length === 0 && parsedAnalysis?.professionalExperience) {
-      const expText = parsedAnalysis.professionalExperience;
-      // Extract bullet points from the text (lines starting with - or •)
-      bullets = expText
-        .split("\n")
-        .map((line) => line.replace(/^[\s-•*]+\s*/, "").trim())
-        .filter(
-          (line) =>
-            line.length > 0 && !line.startsWith("**") && !line.includes("—")
-        );
+    // 2) NEW: if we didn't capture the nested project bullets,
+    // scrape any text-like content from the roles themselves
+    if (bullets.length < 3) {
+      const roles = analysisData.analysis?.pack?.professionalExperience ?? [];
+      const roleTextChunks = roles.flatMap((r) => {
+        // collapse any string-ish fields (headers, sub-sections) into lines
+        const blob = [
+          r.employer,
+          r.title,
+          r.location,
+          r.start,
+          r.end,
+          // if your server includes custom fields like r.projects, r.achievements, etc.
+          // add them here safely:
+          (r as any)?.projects?.join?.(" \n ") ?? "",
+          (r as any)?.achievements?.join?.(" \n ") ?? "",
+        ]
+          .filter(Boolean)
+          .join("\n");
+        return blob
+          .split(/\n|•|-\s+/g)
+          .map((s) => s.trim())
+          .filter(Boolean);
+      });
+
+      bullets = [...bullets, ...roleTextChunks];
     }
 
-    debug("🔍 Resume bullets extraction debug:", {
-      analysisData: analysisData?.analysis?.pack,
-      professionalExperience:
-        analysisData?.analysis?.pack?.professionalExperience,
-      keyProjects: analysisData?.analysis?.pack?.keyProjects,
-      parsedExperience: parsedAnalysis?.professionalExperience,
-      bullets: bullets,
-      bulletsCount: bullets.length,
-      sampleBullets: bullets.slice(0, 3), // Show first 3 bullets for debugging
-    });
-
     return bullets;
-  }, [analysisData?.analysis?.pack, parsedAnalysis?.professionalExperience]);
+  }, [analysisData, parsedAnalysis?.professionalExperience]);
 
-  const quantifiedExamples = useMemo(() => {
-    const examples = extractQuantifiedExamples(resumeBullets, 3);
-    debug("🔍 Quantified examples extraction debug:", {
-      resumeBullets: resumeBullets,
-      bulletsCount: resumeBullets.length,
-      extractedExamples: examples,
-      examplesCount: examples.length,
+  // Place this above the hook (right after resumeBullets/useMemo)
+  const serverQuantified = analysisData?.quantifiedExamples ?? [];
+
+  // Fallback A: scrape any quotes the server surfaced from your resume
+  const evidenceQuotes = useMemo(() => {
+    const jfData = jf as JobFitScoreWithEvidence | undefined;
+    const ev = jfData?.debug?.evidencePreview;
+    const quotes = [
+      ...(ev?.matched ?? []).flatMap((e) => e.resume_quotes ?? []),
+      ...(ev?.missing ?? []).flatMap((e) => e.resume_quotes ?? []),
+    ];
+    return quotes.map((s) => s?.trim()).filter(Boolean);
+  }, [jf]);
+
+  // Fallback B: parse bullets from the rendered text (pack→markdown or markdown fallback)
+  const textBullets = useMemo(() => {
+    const chunks = [
+      parsedAnalysis?.professionalExperience ?? "",
+      parsedAnalysis?.keyProjects ?? "",
+    ].join("\n");
+    return mdListToArray(chunks);
+  }, [parsedAnalysis?.professionalExperience, parsedAnalysis?.keyProjects]);
+
+  const quantifiedAll = useMemo(() => {
+    const raw = [
+      ...(Array.isArray(serverQuantified) ? serverQuantified : []),
+      ...(resumeBullets || []),
+      ...(textBullets || []),
+      ...(evidenceQuotes || []),
+    ]
+      .map((s) => s?.trim())
+      .filter(Boolean) as string[];
+
+    const filtered = raw.filter(isQuantified);
+
+    const seen = new Set<string>();
+    return filtered.filter((x) => {
+      const k = x.toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
     });
-    return examples;
-  }, [resumeBullets]);
+  }, [serverQuantified, resumeBullets, textBullets, evidenceQuotes]);
+
+  const quantifiedExamples = useMemo(
+    () => quantifiedAll.slice(0, 3),
+    [quantifiedAll]
+  );
 
   /* ==== Education items ==== */
   const educationItems = useMemo(
@@ -904,7 +1008,8 @@ ${data.analysis.analysisLists?.overallSummary || "No summary available"}
                   Here's your detailed performance breakdown...
                 </p>
               </div>
-              <div className="flex flex-col items-start md:items-end gap-2 w-full md:w-auto">
+              {/* Download button commented out for MVP launch - to be implemented later */}
+              {/* <div className="flex flex-col items-start md:items-end gap-2 w-full md:w-auto">
                 <Button
                   onClick={handleDownload}
                   className="w-full md:w-auto"
@@ -916,7 +1021,7 @@ ${data.analysis.analysisLists?.overallSummary || "No summary available"}
                 <p className="text-xs font-semibold text-gray-500 text-center md:text-right w-full">
                   Download Detail Report
                 </p>
-              </div>
+              </div> */}
             </div>
           </motion.div>
 
@@ -1006,8 +1111,8 @@ ${data.analysis.analysisLists?.overallSummary || "No summary available"}
             <ATSBreakdown
               details={atsForComponent}
               resumeSkills={resumeSkills}
-              quantifiedExamples={quantifiedExamples}
               jdMatchedCore={coreMatched}
+              quantifiedExamples={quantifiedExamples}
               jdMissingRequired={jdMissingRequired}
               jdMissingDesirable={jdMissingDesirable}
               educationGaps={jdEducationGaps}

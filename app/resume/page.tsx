@@ -7,6 +7,8 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { isQuantified } from "@/lib/isQuantified";
+
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -67,6 +69,52 @@ const resumeFormSchema = z.object({
 });
 
 type ResumeFormData = z.infer<typeof resumeFormSchema>;
+
+// Helper functions moved to top to avoid hoisting issues
+
+const extractQuantifiedExamplesFromAnalysis = (analysis: any): string[] => {
+  const out: string[] = [];
+  if (!analysis?.pack) return out;
+
+  const pushIf = (s?: string) => {
+    if (s && isQuantified(s)) out.push(s.trim());
+  };
+
+  analysis.pack.professionalExperience?.forEach((exp: any) =>
+    exp?.bullets?.forEach(pushIf)
+  );
+  analysis.pack.keyProjects?.forEach((p: any) => p?.bullets?.forEach(pushIf));
+
+  // stable de-dupe
+  const seen = new Set<string>();
+  return out
+    .filter((x) =>
+      seen.has(x.toLowerCase()) ? false : (seen.add(x.toLowerCase()), true)
+    )
+    .slice(0, 5);
+};
+
+// const isQuantifiedBullet = (text: string): boolean => {
+//   const t = text.toLowerCase();
+
+//   if (/\b\d+(?:\.\d+)?\s*%/.test(t)) return true; // 15%
+//   if (/(?:\$|usd)\s?\d[\d,]*(?:\.\d+)?\s*(k|m|b|million|billion)?\b/.test(t))
+//     return true; // $350M
+//   if (
+//     /\b\d[\d,]*(?:\.\d+)?\s*(years?|months?|weeks?|days?|hours?|people|employees?|team(?:\s?members?)?|clients?|customers?|projects?|tickets?|leads?|users?)\b/.test(
+//       t
+//     )
+//   )
+//     return true; // 10 people, 6 months
+//   if (
+//     /\b(increased|decreased|reduced|grew|boosted|cut|saved|improved)\b.*\b\d[\d,]*(?:\.\d+)?\b/.test(
+//       t
+//     )
+//   )
+//     return true; // saved 200 hours
+
+//   return false;
+// };
 
 const ResumePage = () => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -252,71 +300,93 @@ const ResumePage = () => {
       }
 
       const result = await response.json();
+      console.log("🚨 RESUME PAGE: API Response received", result);
       debug("✅ Full API Response:", result);
+      debug("🔍 About to check result.success:", result.success);
 
       if (result.success) {
-        // Check if the analysis is already structured or needs parsing
-        if (typeof result.analysis === "string") {
-          // Backend returned text analysis - parse it
-          const parsedAnalysis = parseAnalysisText(result.analysis);
+        debug("🔍 ENTERING SUCCESS BLOCK - localStorage storage will happen");
+        debug("🔍 API Response received:", {
+          success: result.success,
+          hasAnalysis: !!result.analysis,
+          hasPack: !!result.analysis?.pack,
+          analysisType: typeof result.analysis,
+        });
 
-          // Extract scores from the parsed analysis
-          const atsScoreMatch = result.analysis.match(/ATS Score[^\d]*(\d+)/i);
-          const matchScoreMatch = result.analysis.match(
-            /Match Score[^\d]*(\d+)/i
-          );
+        // Create a comprehensive storage object
+        const storageData = {
+          success: true,
+          analysis: result.analysis || result,
+          atsScore: result.analysis?.atsScore?.score || result.atsScore || 0,
+          matchScore:
+            result.analysis?.jobFitScore?.score || result.matchScore || 0,
+          timestamp: new Date().toISOString(),
+          // Add quantified examples extraction here directly
+          quantifiedExamples: (() => {
+            try {
+              const examples = extractQuantifiedExamplesFromAnalysis(
+                result.analysis || result
+              );
+              debug("🔍 Extracted quantified examples:", {
+                count: examples.length,
+                examples: examples.slice(0, 2), // Show first 2 for debugging
+              });
+              return examples;
+            } catch (error) {
+              debug("❌ Error extracting quantified examples:", error);
+              return [];
+            }
+          })(),
+        };
 
-          const atsScore = atsScoreMatch ? parseInt(atsScoreMatch[1]) : 0;
-          const matchScore = matchScoreMatch ? parseInt(matchScoreMatch[1]) : 0;
+        // Debug the storage
+        debug("💾 Storing analysis data:", {
+          hasAnalysis: !!storageData.analysis,
+          hasPack: !!storageData.analysis?.pack,
+          atsScore: storageData.atsScore,
+          matchScore: storageData.matchScore,
+          quantifiedExamplesCount: storageData.quantifiedExamples.length,
+        });
 
-          debug("📊 Parsed Analysis:", {
-            atsScore,
-            matchScore,
-            analysis: parsedAnalysis,
+        // Store in localStorage
+        try {
+          localStorage.setItem("resumeAnalysis", JSON.stringify(storageData));
+          debug("✅ Successfully stored in localStorage:", {
+            key: "resumeAnalysis",
+            hasData: !!localStorage.getItem("resumeAnalysis"),
+            dataSize: JSON.stringify(storageData).length,
           });
-
-          // Store the parsed data
-          localStorage.setItem(
-            "resumeAnalysis",
-            JSON.stringify({
-              ...result,
-              analysis: parsedAnalysis,
-              atsScore,
-              matchScore,
-            })
-          );
-        } else {
-          // Backend returned structured analysis
-          debug("📊 Structured Analysis:", result.analysis);
+        } catch (error) {
+          debug("❌ Failed to store in localStorage:", error);
         }
 
-        // Store resume info
+        // Store resume info separately
         const resumeInfo = {
           name: uploadedFile.name,
           type: uploadedFile.type,
           size: uploadedFile.size,
         };
+        localStorage.setItem("resumeInfo", JSON.stringify(resumeInfo));
 
         // Show success message with scores
-        const displayAtsScore =
-          result.analysis?.atsScore?.score || result.atsScore || 0;
-        const displayMatchScore =
-          result.analysis?.jobFitScore?.score || result.matchScore || 0;
-
         toast.success(
-          `Analysis Complete! ATS Score: ${displayAtsScore}/100 | Match Score: ${displayMatchScore}/100`
+          `Analysis Complete! ATS Score: ${storageData.atsScore}/100 | Match Score: ${storageData.matchScore}/100`
         );
+
         debug("🔍 About to navigate to /results", {
           resultSuccess: result.success,
           hasLocalStorage: typeof localStorage !== "undefined",
+          localStorageKeys: Object.keys(localStorage),
+          resumeAnalysisExists: !!localStorage.getItem("resumeAnalysis"),
         });
-
-        // Store data in localStorage and navigate to results
-        localStorage.setItem("resumeAnalysis", JSON.stringify(result));
-        localStorage.setItem("resumeInfo", JSON.stringify(resumeInfo));
 
         router.push("/results");
       } else {
+        debug("❌ result.success is FALSE:", {
+          success: result.success,
+          error: result.error,
+          result: result,
+        });
         toast.error(result.error || "Analysis failed");
         return;
       }

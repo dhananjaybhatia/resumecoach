@@ -127,7 +127,6 @@ const Pill: React.FC<{ kind: "ok" | "miss"; children: React.ReactNode }> = ({
       alt={kind === "ok" ? "✓" : "!"}
       width={12}
       height={12}
-      style={{ width: "auto", height: "auto" }}
     />
     {children}
   </span>
@@ -386,6 +385,8 @@ const ATSBreakdown: React.FC<Props> = ({
   educationGaps = [],
   educationItems = [],
 }) => {
+  const count = quantifiedExamples?.length ?? 0;
+
   const serverScore =
     typeof details === "number" ? details : details?.score ?? 0;
 
@@ -525,13 +526,7 @@ const ATSBreakdown: React.FC<Props> = ({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Image
-            src={iconSrc}
-            alt="ATS"
-            width={50}
-            height={50}
-            style={{ width: "auto", height: "auto" }}
-          />
+          <Image src={iconSrc} alt="ATS" width={50} height={50} />
           <div className="flex flex-col">
             <h3 className="text-3xl font-semibold">
               ATS Score: <span>{serverScore}/100</span>
@@ -885,13 +880,28 @@ const ATSBreakdown: React.FC<Props> = ({
                                   })
                                   .join(" ");
 
+                                // Check if this is a "No Quantified Metrics" case
+                                const isNoQuantifiedMetrics =
+                                  formattedText
+                                    .toLowerCase()
+                                    .includes("no quantified") ||
+                                  formattedText
+                                    .toLowerCase()
+                                    .includes("0 quantified");
+
                                 return (
                                   <div
                                     key={i}
                                     className="flex items-center gap-2 text-sm text-gray-700"
                                   >
-                                    <span className="text-green-500 font-medium">
-                                      ✓
+                                    <span
+                                      className={
+                                        isNoQuantifiedMetrics
+                                          ? "text-orange-500 font-medium"
+                                          : "text-green-500 font-medium"
+                                      }
+                                    >
+                                      {isNoQuantifiedMetrics ? "⚠" : "✓"}
                                     </span>
                                     <span>{formattedText}</span>
                                   </div>
@@ -1027,18 +1037,6 @@ const ATSBreakdown: React.FC<Props> = ({
                     </>
                   );
                 })()}
-
-                {/* Improvement tips for all sections */}
-                <div className="mt-4">
-                  <h5 className="text-sm font-semibold text-blue-800 mb-2">
-                    💡 How to improve your {b.key} score:
-                  </h5>
-                  <ul className="text-sm text-gray-700 list-disc pl-5">
-                    {IMPROVEMENT_TIPS[b.key].map((tip, i) => (
-                      <li key={i}>{tip}</li>
-                    ))}
-                  </ul>
-                </div>
 
                 {/* Education Section - Dynamic feedback based on score */}
                 {b.key === "Education" &&
@@ -1187,7 +1185,31 @@ const ATSBreakdown: React.FC<Props> = ({
                             alt="✓"
                             width={12}
                             height={12}
-                            style={{ width: "auto", height: "auto" }}
+                          />
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {b.key === "Skills" && cleanMissingRequired.length > 0 && (
+                  <div className="mt-3">
+                    <h5 className="text-sm font-semibold text-gray-800 mb-2">
+                      ❌ Missing skills from job description (
+                      {cleanMissingRequired.length} skills missing):
+                    </h5>
+                    <div className="flex flex-wrap gap-2">
+                      {cleanMissingRequired.map((skill, i) => (
+                        <span
+                          key={`missing-${skill}-${i}`}
+                          className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 text-red-700 px-2 py-1 text-xs font-medium"
+                        >
+                          <Image
+                            src="/icons/cross.svg"
+                            alt="✗"
+                            width={12}
+                            height={12}
                           />
                           {skill}
                         </span>
@@ -1211,7 +1233,7 @@ const ATSBreakdown: React.FC<Props> = ({
                           <div>
                             <h5 className="text-sm font-semibold text-gray-800 mb-2">
                               📊 Quantified achievements found in your
-                              experience ({quantifiedExamples.length} examples):
+                              experience:
                             </h5>
                             <div className="space-y-2">
                               {quantifiedExamples.map((ex, i) => (
@@ -1225,12 +1247,16 @@ const ATSBreakdown: React.FC<Props> = ({
                                   <span>
                                     {ex
                                       .split(
-                                        /(\d+%|\d+\.\d+%|\d+\s*percent|\$\d+[KM]?|\d+[KM]?\s*(dollars|USD)|\d+\s*(years?|months?|days?|hours?|people|team members?|clients?|projects?))/i
+                                        /(\d+%|\d+\.\d+%|\d+\s*percent|\$\d+(?:\.\d+)?[KM]?|\d+(?:\.\d+)?[KM]?\s*(dollars|USD)|\d+\s*(years?|months?|days?|hours?|people|team members?|clients?|projects?))/i
                                       )
                                       .map((part, idx) => {
                                         // Check if this part is a meaningful quantified result
-                                        const isQuantified = /(\d+%|\d+\.\d+%|\d+\s*percent|\$\d+[KM]?|\d+[KM]?\s*(dollars|USD)|\d+\s*(years?|months?|days?|hours?|people|team members?|clients?|projects?))/i.test(part);
-                                        
+
+                                        const isQuantified =
+                                          /(\d+%|\d+\.\d+%|\d+\s*percent|\$\d+(?:\.\d+)?[KM]?|\d+(?:\.\d+)?[KM]?\s*(dollars|USD)|\d+\s*(years?|months?|days?|hours?|people|team members?|clients?|projects?))/i.test(
+                                            part
+                                          );
+
                                         if (isQuantified) {
                                           return (
                                             <strong
@@ -1258,6 +1284,18 @@ const ATSBreakdown: React.FC<Props> = ({
                       </div>
                     );
                   })()}
+
+                {/* Improvement tips for all sections */}
+                <div className="mt-4">
+                  <h5 className="text-sm font-semibold text-blue-800 mb-2">
+                    💡 How to improve your {b.key} score:
+                  </h5>
+                  <ul className="text-sm text-gray-700 list-disc pl-5">
+                    {IMPROVEMENT_TIPS[b.key].map((tip, i) => (
+                      <li key={i}>{tip}</li>
+                    ))}
+                  </ul>
+                </div>
               </AccordionContent>
             </AccordionItem>
           );

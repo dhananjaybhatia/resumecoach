@@ -34,6 +34,8 @@ type KeywordMatchSem = KeywordMatch & {
     partial: string[];
 };
 
+/** -------------------- Resume Validation -------------------- */
+
 function filterDegreeTitleKeywords(keywords: string[]): string[] {
     const degreeTitles = [
         "statistics", "mathematics", "computer science", "economics",
@@ -143,6 +145,141 @@ function noStoreHeaders() {
     return { "Cache-Control": "no-store, max-age=0", Pragma: "no-cache", Expires: "0" };
 }
 
+/** -------------------- Job Description Validation -------------------- */
+
+function validateResumeContent(text: string): { isValid: boolean; issues: string[] } {
+    const issues: string[] = [];
+
+    // Normalize text for analysis
+    const normalizedText = text.toLowerCase().normalize("NFKC");
+    const words = normalizedText.split(/\s+/).filter(word => word.length > 2);
+
+    // Common resume indicators
+    const resumeIndicators = [
+        // Sections
+        /\b(experience|work\s+history|employment)\b/i,
+        /\b(education|qualifications?|academic)\b/i,
+        /\b(skills?|competencies?|technical\s+skills)\b/i,
+        /\b(summary|profile|objective)\b/i,
+
+        // Job-related terms
+        /\b(managed|led|developed|implemented|achieved)\b/i,
+        /\b(responsibilities?|duties?|achievements?)\b/i,
+        /\b(company|employer|organization)\b/i,
+        /\b(position|role|title)\b/i,
+
+        // Education terms
+        /\b(university|college|degree|bachelor|master|phd|diploma|certificate)\b/i,
+
+        // Date patterns (employment dates)
+        /\b(20\d{2}[\s\-–—]\s*20\d{2}|present|current)\b/i,
+        /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+20\d{2}\b/i
+    ];
+
+    // Common non-resume content indicators (bank statements, etc.)
+    const nonResumeIndicators = [
+        // Financial terms
+        /\b(account\s+balance|transaction|deposit|withdrawal|debit|credit)\b/i,
+        /\b(balance\s+forward|opening\s+balance|closing\s+balance)\b/i,
+        /\b(statement\s+period|account\s+summary|bank\s+statement)\b/i,
+        /\$\d+\.?\d*/g, // Dollar amounts (too many might indicate financial doc)
+
+        // Invoice terms
+        /\b(invoice\s+number|invoice\s+date|due\s+date|total\s+amount)\b/i,
+        /\b(quantity|unit\s+price|subtotal|tax|grand\s+total)\b/i,
+
+        // Contract terms
+        /\b(party\s+of\s+the|herein|whereas|therefore|agreement)\b/i,
+        /\b(contract\s+number|effective\s+date|termination)\b/i
+    ];
+
+    // Check for resume indicators
+    const resumeIndicatorCount = resumeIndicators.filter(indicator =>
+        indicator.test(normalizedText)
+    ).length;
+
+    // Check for non-resume indicators
+    const nonResumeIndicatorCount = nonResumeIndicators.filter(indicator => {
+        const matches = normalizedText.match(indicator);
+        return matches && matches.length > 3; // Only flag if multiple occurrences
+    }).length;
+
+    // Word count check (resumes are typically 300-1000 words)
+    if (words.length < 100) {
+        issues.push("Document appears too short to be a resume (minimum 100 words expected)");
+    }
+
+    if (words.length > 2000) {
+        issues.push("Document appears too long to be a resume (typical resumes are 300-1000 words)");
+    }
+
+    // Check for sufficient resume structure
+    if (resumeIndicatorCount < 3) {
+        issues.push("Document lacks typical resume structure (missing common sections like Experience, Education, Skills)");
+    }
+
+    // Check for financial document patterns
+    if (nonResumeIndicatorCount > 2) {
+        issues.push("Document appears to be a financial statement or invoice rather than a resume");
+    }
+
+    // Check for personal information patterns (resumes should have some)
+    const personalInfoPatterns = [
+        /\b[\w._%+-]+@[\w.-]+\.[A-Za-z]{2,}\b/, // Email
+        /\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/, // Phone number
+        /\b([A-Z][a-z]+)\s+([A-Z][a-z]+)\b/ // Proper name pattern
+    ];
+
+    const personalInfoCount = personalInfoPatterns.filter(pattern =>
+        pattern.test(text)
+    ).length;
+
+    if (personalInfoCount === 0) {
+        issues.push("No personal contact information detected (typical resumes include name, email, or phone)");
+    }
+
+    const isValid = issues.length === 0 && resumeIndicatorCount >= 3;
+
+    return { isValid, issues };
+}
+
+function isLikelyRealJD(jdText: string): boolean {
+    const text = jdText.toLowerCase().trim();
+
+    // Check minimum meaningful content
+    const meaningfulWords = text.split(/\s+/).filter(word =>
+        word.length > 3 && /[a-zA-Z]/.test(word)
+    ).length;
+
+    if (meaningfulWords < 15) {
+        return false; // Too short to be a real JD
+    }
+
+    // Check for JD-like structure (relaxed criteria)
+    const hasJDSections = /(requirements?|qualifications?|skills?|responsibilities?|experience|education|duties?|must have|should have)/i.test(text);
+
+    // Check for job-related content (more flexible)
+    const hasJobContent = /(role|position|job|looking for|seek|hiring|join our|team|company|organization)/i.test(text);
+
+    // Check for action-oriented language
+    const hasActionLanguage = text.split(/\s+/).filter(word =>
+        /\b(manage|develop|create|build|analyze|support|lead|coordinate|implement|design)\w*/i.test(word)
+    ).length > 5;
+
+    // Multiple indicators increase confidence
+    const indicators = [
+        hasJDSections,
+        hasJobContent,
+        hasActionLanguage,
+        meaningfulWords > 50, // Substantial content
+    ];
+
+    const confidenceScore = indicators.filter(Boolean).length;
+
+    // Require at least 2 out of 4 indicators to be true
+    return confidenceScore >= 2;
+}
+
 function evidenceSafeJoin(arr?: string[]): string[] {
     return Array.isArray(arr) ? arr.map(toStr).filter(Boolean).slice(0, 3) : [];
 }
@@ -196,7 +333,7 @@ async function extractTextFromPdfBytes(bytes: Uint8Array): Promise<string> {
 
 /** -------------------- File → text (DOCX/PDF/TXT) -------------------- */
 
-async function extractTextFromFile(file: File): Promise<{ text: string; sections: any }> {
+async function extractTextFromFile(file: File): Promise<{ text: string; sections: any; isValidResume: boolean; validationIssues: string[] }> {
     try {
         // Get the raw bytes once
         const ab = await file.arrayBuffer();
@@ -219,7 +356,7 @@ async function extractTextFromFile(file: File): Promise<{ text: string; sections
             extractedText = result.value || "";
         } else if (isPdf) {
             // pdfjs-dist v5 wants Uint8Array - use it directly
-            const bytes = new Uint8Array(ab);  // This is already a Uint8Array
+            const bytes = new Uint8Array(ab);
             extractedText = await extractTextFromPdfBytes(bytes);
             if (!extractedText || extractedText.trim().length < 50) {
                 throw new Error(
@@ -232,7 +369,6 @@ async function extractTextFromFile(file: File): Promise<{ text: string; sections
             throw new Error("Unsupported file type. Please upload a PDF, DOCX, or TXT.");
         }
 
-        // ... rest of your function remains the same
         // Normalise whitespace
         extractedText = extractedText
             .normalize("NFKC")
@@ -241,6 +377,9 @@ async function extractTextFromFile(file: File): Promise<{ text: string; sections
             .replace(/[ \t]+\n/g, "\n")
             .replace(/\n{3,}/g, "\n\n")
             .trim();
+
+        // Validate if it's actually a resume FIRST
+        const validation = validateResumeContent(extractedText);
 
         const text = extractedText.toLowerCase();
         const sections = {
@@ -257,7 +396,12 @@ async function extractTextFromFile(file: File): Promise<{ text: string; sections
             usesBullets: /•|\*|\-|\d\./.test(extractedText),
         };
 
-        return { text: extractedText, sections };
+        return {
+            text: extractedText,
+            sections,
+            isValidResume: validation.isValid,
+            validationIssues: validation.issues
+        };
     } catch (error) {
         console.error("Text extraction error:", error);
         throw new Error(error instanceof Error ? error.message : "Failed to extract text from file");
@@ -476,28 +620,53 @@ function genVariants(tok: string): string[] {
 
 
 
+// function isLikelyKeyword(tok: string): boolean {
+//     if (!tok) return false;
+//     const lc = tok.toLowerCase();
+
+//     // drop long generic phrases outright (over 5 words)
+//     if (tok.split(/\s+/).length > 5) return false;
+
+//     // drop JD boilerplate we never want as keywords
+//     if (/\b(highly regarded|preferably|preferred|required|desirable|essential|experience across|experience with|good understanding of)\b/i.test(tok)) {
+//         return false;
+//     }
+
+//     if (STOPWORDS.has(lc)) return false;
+//     // drop very short generic tokens unless ALL CAPS (e.g., R, C, C#)
+//     if (tok.length < 2 && tok !== "R") return false;
+
+//     // keep acronyms, techs, proper nouns, hyphenated/with punctuation
+//     const looksLikeTech =
+//         /[A-Z][a-z]/.test(tok) ||               // TitleCase (Power, Tableau, ThoughtSpot)
+//         /^[A-Z0-9\.\+#-]{2,}$/.test(tok) ||     // ALLCAPS/acronyms/.NET/C#/C++
+//         /[A-Za-z]+\s+[A-Za-z]+/.test(tok) ||    // multi-word
+//         /[0-9]/.test(tok);                      // versions (ISO 27001, ITIL v4)
+
+//     return looksLikeTech;
+// }
+
 function isLikelyKeyword(tok: string): boolean {
     if (!tok) return false;
     const lc = tok.toLowerCase();
 
-    // drop long generic phrases outright (over 5 words)
+    // Reject overly generic phrases
+    const tooGeneric = [
+        'to inform strategy', 'in excel especially', 'driving integrations',
+        'anything related', 'background', 'benefit', 'several years'
+    ];
+    if (tooGeneric.some(phrase => lc.includes(phrase))) return false;
+
+    // Existing checks...
     if (tok.split(/\s+/).length > 5) return false;
-
-    // drop JD boilerplate we never want as keywords
-    if (/\b(highly regarded|preferably|preferred|required|desirable|essential|experience across|experience with|good understanding of)\b/i.test(tok)) {
-        return false;
-    }
-
     if (STOPWORDS.has(lc)) return false;
-    // drop very short generic tokens unless ALL CAPS (e.g., R, C, C#)
     if (tok.length < 2 && tok !== "R") return false;
 
-    // keep acronyms, techs, proper nouns, hyphenated/with punctuation
     const looksLikeTech =
-        /[A-Z][a-z]/.test(tok) ||               // TitleCase (Power, Tableau, ThoughtSpot)
-        /^[A-Z0-9\.\+#-]{2,}$/.test(tok) ||     // ALLCAPS/acronyms/.NET/C#/C++
-        /[A-Za-z]+\s+[A-Za-z]+/.test(tok) ||    // multi-word
-        /[0-9]/.test(tok);                      // versions (ISO 27001, ITIL v4)
+        /[A-Z][a-z]/.test(tok) ||
+        /^[A-Z0-9\.\+#-]{2,}$/.test(tok) ||
+        /[A-Za-z]+\s+[A-Za-z]+/.test(tok) ||
+        /[0-9]/.test(tok);
 
     return looksLikeTech;
 }
@@ -581,6 +750,30 @@ function buildJDDictionary(jd: string): string[] {
         ...nounPhrases,
     ];
 
+    // STRICTER FILTERING - Add these conditions
+    const isValidKeyword = (tok: string) => {
+        if (!tok || tok.trim().length < 2) return false;
+        // Reject sentence fragments and vague phrases
+        const lc = tok.toLowerCase();
+        const badPatterns = [
+            /^(to|in|with|for|and|or|the|a|an)$/i, // Single common words
+            /^(especially|related|anything|something|various)/i, // Vague starters
+            /(strategy|improvement|analysis|reporting)$/i, // Too generic alone
+            /\b(inform|drive|integrate|build|map|automate)\b/i, // Verbs without objects
+        ];
+
+        if (badPatterns.some(pattern => pattern.test(lc))) return false;
+
+        // Must look like a real skill/tool/technology
+        const looksLikeRealSkill =
+            /^[A-Z][a-z]+/.test(tok) || // Title case (Power BI, Salesforce)
+            /^[A-Z]{2,}$/.test(tok) || // Acronyms (SQL, API, ETL)
+            /[0-9]/.test(tok) || // Contains numbers (Python 3, SQL Server 2019)
+            /[+#-]/.test(tok) || // Special chars (C#, C++, .NET)
+            tok.split(/\s+/).length <= 3; // Reasonable length
+
+        return looksLikeRealSkill;
+    };
     // Optional extras via env (JSON array string), e.g. '["Cognos","ThoughtSpot"]'
     let extras: string[] = [];
     try {
@@ -593,8 +786,9 @@ function buildJDDictionary(jd: string): string[] {
     // Clean → filter → canonicalise → de-dup (case-insensitive)
     const seen = new Set<string>();
     const dict: string[] = [];
-    for (const t of [...raw, ...extras]) {
+    for (const t of raw) {
         const tok = canon(cleanToken(t));
+        if (!isValidKeyword(tok)) continue; // ADD THIS FILTER
         if (!isLikelyKeyword(tok)) continue;
         const k = tok.toLowerCase();
         if (!seen.has(k)) {
@@ -1401,16 +1595,42 @@ export async function POST(request: NextRequest) {
             word.length > 3 && /[a-zA-Z]/.test(word)
         ).length;
 
-        if (meaningfulWords < 5) {
+        if (meaningfulWords < 10) {
             return NextResponse.json({
                 error: "Invalid job description",
                 message: "Please provide a meaningful job description with actual content"
             }, { status: 400 });
         }
 
-        const { text: resumeText, sections } = await extractTextFromFile(file);
+        if (!isLikelyRealJD(jobDescription)) {
+            return NextResponse.json({
+                error: "Invalid job description",
+                message: "The provided text doesn't appear to be a valid job description. Please provide a real job description with requirements, skills, and responsibilities.",
+                issues: [`Text appears to be random or incomplete (${meaningfulWords} meaningful words found)`]
+            }, { status: 400 });
+        }
+        const { text: resumeText, sections, isValidResume, validationIssues } = await extractTextFromFile(file);
+
+        // Add validation check BEFORE any other processing
+        if (!isValidResume) {
+            return NextResponse.json({
+                error: "Invalid resume file",
+                message: "The uploaded file doesn't appear to be a resume. Please upload a valid resume document.",
+                issues: validationIssues
+            }, { status: 400, headers: noStoreHeaders() });
+        }
+
+        // Then keep your existing word count check:
         if (resumeText.split(/\s+/).length < 100) {
-            return NextResponse.json({ error: "Resume appears to be too short or unreadable" }, { status: 400, headers: noStoreHeaders() });
+            return NextResponse.json({
+                error: "Invalid resume content",
+                message: "The document appears to be too short or doesn't contain resume content."
+            }, { status: 400, headers: noStoreHeaders() });
+        }
+
+        // Then continue with your existing code...
+        if (jobDescription.trim().length < 50) {
+            return NextResponse.json({ error: "Valid job/position description is required" }, { status: 400, headers: noStoreHeaders() });
         }
 
         // Scoped excerpts for high-precision extraction
@@ -1605,19 +1825,7 @@ export async function POST(request: NextRequest) {
                             //     },
                             // },
                             educationAndCertification: eduSchema,
-                            // educationAndCertification: {
-                            //     type: "array",
-                            //     items: {
-                            //         type: "object",
-                            //         additionalProperties: false,
-                            //         properties: {
-                            //             name: { type: "string" },
-                            //             institution: { type: "string" },
-                            //             year: { type: "string" },
-                            //         },
-                            //         required: ["name", "institution", "year"],
-                            //     },
-                            // },
+
                             toolsAndTechnologies: { type: "array", items: { type: "string" } },
                         },
                         required: [
@@ -1801,14 +2009,14 @@ ROLE/DOMAIN DETECTION
 
 SKILLS
 - resumePack.keySkills: explicit verbatim skills (atomic).
-- resumePack.inferredSkills: inferred skills with 1–3 short CV quotes, category (tool|language|methodology|domain|soft), confidence 0–100.
+- resumePack.inferredSkills: inferred skills with 1–5 short CV quotes, category (tool|language|methodology|domain|soft), confidence 0–100.
 
 PROJECTS
 - Extract from Projects AND from Experience bullets when project-like; up to 20 items.
-- For each: name, 1–5 outcome bullets, and nearby tools (no invention).
+- For each: name, 1–7 outcome bullets, and nearby tools (no invention).
 
 EXPERIENCE
-- Extract all roles found; for each: employer, title, location, start, end, 1–5 bullets (no invention).
+- Extract all roles found; for each: employer, title, location, start, end, 1–7 bullets (no invention).
 
 EDUCATION
 - Extract ALL degrees/certifications/courses/training/workshops/pro dev across the whole resume.
@@ -1846,7 +2054,7 @@ ATS BREAKDOWN (REQUIRED)
   "Skills: [score]/20 — …"
   "Experience: [score]/20 — …"
   "Education: [score]/10 — …"
-  "Keywords: [score]/10 — Matches X% of Job Description keywords; Missing: [list 3–5 critical tools/skills]"
+  "Keywords: [score]/10 — Matches X% of Job Description keywords; Missing: [list 3–7 critical tools/skills]"
 
 SCORING RUBRIC (0–100 ONLY)
 - mustHave, coreSkills, domainTitleAdjacency, seniority, recency, niceToHaves are integers 0–100.
@@ -1859,8 +2067,8 @@ ANALYSIS LISTS
 - recommendations: 1–5 new, actionable suggestions addressing Job Description gaps.
 
 EVIDENCE & VALIDATION
-- Matched items: up to 3 brief resume_quotes + up to 3 jd_quotes.
-- Missing items: up to 3 jd_quotes proving the requirement.
+- Matched items: up to 4 brief resume_quotes + up to 5 jd_quotes.
+- Missing items: up to 5 jd_quotes proving the requirement.
 - CRITICAL: The same Job Description requirement must NOT appear in both 'matched' and 'missing'.
 
 EXTRACTION
@@ -1925,7 +2133,7 @@ TASKS
 3) Score ATS (score + the six-item breakdown with reasons) and Job Match; fill all bucket scores.
 4) Provide evidence arrays:
    - "matched": for each matched item, include up to 3 brief resume_quotes and up to 3 jd_quotes.
-   - "missing": for each missing item, include up to 3 jd_quotes.
+   - "missing": for ALL missing items, include up to 3 jd_quotes. Do not limit the number of missing items - include every skill/requirement that is missing from the resume.
 
 Return ONLY the JSON object. No commentary.
 `.trim();
@@ -2125,7 +2333,7 @@ Return ONLY the JSON object. No commentary.
         const idx = (label: string) => atsBreakdownCompleted.findIndex(b => b.label === label);
 
         // Skills reasons
-        // In “Skills reasons” block
+        // In "Skills reasons" block
         const skillsIdx = idx("Skills");
         if (skillsIdx >= 0) {
             const skillsExcerptX = extractWithFallback(resumeText, "skills", 0);
@@ -2153,7 +2361,7 @@ Return ONLY the JSON object. No commentary.
             if (expIdx2 >= 0) {
                 const expTxt2 = (extractSection(resumeText, "experience") || resumeText).toLowerCase();
                 const actionHits2 = (expTxt2.match(/\b(le(?:d|ad)|manag|coordinat|implement|develop|optimis|streamlin|reduce|increase|improve|save|administer|perform|monitor|train|mentor)\w*/g) || []).length;
-                const metricHits2 = (expTxt2.match(/(\$[\d,]+|\d+(?:\.\d+)?%|\b\d{1,3}(?:,\d{3})+\b)/g) || []).length;
+                const metricHits2 = (expTxt2.match(/(\d+%|\d+\.\d+%|\d+\s*percent|\$\d+[km]?|\d+[km]?\s*(dollars|usd)|\d+\s*(years?|months?|days?|hours?|people|team members?|clients?|projects?))/g) || []).length;
                 const expReasons = [
                     actionHits2 ? `${actionHits2} action verbs` : "few action verbs",
                     metricHits2 ? `${metricHits2} quantified metrics` : "no quantified metrics"
@@ -2321,11 +2529,19 @@ Return ONLY the JSON object. No commentary.
                 resume_quotes: evidenceSafeJoin(e?.resume_quotes),
                 jd_quotes: evidenceSafeJoin(e?.jd_quotes),
             })),
-            missing: evMissing.slice(0, 5).map((e: any) => ({
+            missing: evMissing.map((e: any) => ({
                 item: toStr(e?.item),
                 jd_quotes: evidenceSafeJoin(e?.jd_quotes),
             })),
         };
+
+        // Debug logging for evidence preview
+        debug("🔍 Evidence Preview Debug:", {
+            evMatchedCount: evMatched.length,
+            evMissingCount: evMissing.length,
+            evidencePreviewMissing: evidencePreview.missing,
+            evidencePreviewMatched: evidencePreview.matched
+        });
 
 
         /** ---------- 2) Narrative call ---------- */
