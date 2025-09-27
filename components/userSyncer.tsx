@@ -2,6 +2,7 @@
 
 import { useUser } from "@clerk/nextjs";
 import { useEffect, useRef } from "react";
+import { debug } from "@/lib/debug";
 
 export default function UserSyncer() {
   const { isLoaded, isSignedIn, user } = useUser();
@@ -23,7 +24,7 @@ export default function UserSyncer() {
         if (!res.ok) {
           console.error("❌ sync-user failed", { status: res.status, body });
         } else {
-          console.log("✅ synced user", body);
+          debug("✅ synced user", body);
         }
       } catch (e) {
         console.error("❌ sync-user network error", e);

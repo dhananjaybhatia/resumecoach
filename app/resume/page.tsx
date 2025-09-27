@@ -21,6 +21,7 @@ import { toast } from "@/lib/toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { Country, State } from "country-state-city";
+import { debug } from "@/lib/debug";
 
 const isFile = (v: unknown): v is File =>
   typeof File !== "undefined" && v instanceof File;
@@ -198,7 +199,7 @@ const ResumePage = () => {
       if (!response.ok) {
         try {
           const errorResult = await response.json();
-          console.log("❌ API Error Response:", errorResult);
+          debug("❌ API Error Response:", errorResult);
 
           // 🆕 HANDLE RATE LIMIT - REDIRECT BASED ON AUTH STATUS
           if (response.status === 429) {
@@ -251,7 +252,7 @@ const ResumePage = () => {
       }
 
       const result = await response.json();
-      console.log("✅ Full API Response:", result);
+      debug("✅ Full API Response:", result);
 
       if (result.success) {
         // Check if the analysis is already structured or needs parsing
@@ -268,7 +269,7 @@ const ResumePage = () => {
           const atsScore = atsScoreMatch ? parseInt(atsScoreMatch[1]) : 0;
           const matchScore = matchScoreMatch ? parseInt(matchScoreMatch[1]) : 0;
 
-          console.log("📊 Parsed Analysis:", {
+          debug("📊 Parsed Analysis:", {
             atsScore,
             matchScore,
             analysis: parsedAnalysis,
@@ -286,7 +287,7 @@ const ResumePage = () => {
           );
         } else {
           // Backend returned structured analysis
-          console.log("📊 Structured Analysis:", result.analysis);
+          debug("📊 Structured Analysis:", result.analysis);
         }
 
         // Store resume info
@@ -305,7 +306,7 @@ const ResumePage = () => {
         toast.success(
           `Analysis Complete! ATS Score: ${displayAtsScore}/100 | Match Score: ${displayMatchScore}/100`
         );
-        console.log("🔍 About to navigate to /results", {
+        debug("🔍 About to navigate to /results", {
           resultSuccess: result.success,
           hasLocalStorage: typeof localStorage !== "undefined",
         });

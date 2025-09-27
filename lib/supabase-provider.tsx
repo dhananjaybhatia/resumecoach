@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { debug } from "@/lib/debug";
 import { useSession } from "@clerk/nextjs";
 import {
   createContext,
@@ -41,12 +42,12 @@ export default function SupabaseProvider({ children }: Props) {
             token = await session.getToken({ template: "supabase" });
           } catch (error) {
             console.error("❌ Failed to get JWT token:", error);
-            console.log(
+            debug(
               "💡 Make sure you have configured the 'supabase' JWT template in Clerk dashboard"
             );
           }
         }
-        console.log("🔑 Supabase JWT Bridge:", {
+        debug("🔑 Supabase JWT Bridge:", {
           hasSession: !!session,
           hasToken: !!token,
           tokenPreview: token ? `${token.substring(0, 20)}...` : null,

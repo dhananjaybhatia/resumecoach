@@ -2,6 +2,7 @@
 
 // middleware.ts
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { debug } from '@/lib/debug';
 
 // Define public routes that don't need authentication
 const isPublicRoute = createRouteMatcher([
@@ -19,7 +20,7 @@ export default clerkMiddleware(async (auth, req) => {
     const { pathname } = req.nextUrl;
 
     // Debug logging
-    console.log("🔍 Middleware:", {
+    debug("🔍 Middleware:", {
         pathname,
         isPublic: isPublicRoute(req),
         hasAuth: !!auth

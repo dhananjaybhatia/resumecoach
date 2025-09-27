@@ -4,6 +4,7 @@ import OpenAI from "openai";
 import mammoth from "mammoth";
 import crypto from "crypto";
 import { checkRateLimit } from '@/lib/rate.limit';
+import { debug } from '@/lib/debug';
 
 /** Next.js runtime flags */
 export const dynamic = "force-dynamic";
@@ -566,7 +567,7 @@ function buildJDDictionary(jd: string): string[] {
     const triggeredLists = extractTriggeredLists(jd);
     const nounPhrases = extractNounPhrases(jd);
 
-    console.log("🔍 buildJDDictionary debug:", {
+    debug("🔍 buildJDDictionary debug:", {
         jdLength: jd.length,
         jdPreview: jd.substring(0, 200) + "...",
         triggeredListsCount: triggeredLists.length,
@@ -625,7 +626,7 @@ function buildJDDictionary(jd: string): string[] {
     // Cap to avoid overweighting very long JDs
     const final = cleaned.slice(0, 60);
 
-    console.log("🔍 buildJDDictionary final result:", {
+    debug("🔍 buildJDDictionary final result:", {
         rawCount: raw.length,
         dictCount: dict.length,
         filteredCount: filtered.length,
@@ -737,7 +738,7 @@ export function computeKeywordMatch(jd: string, cv: string): KeywordMatch {
     let DICT = buildJDDictionary(jd);
 
     // Debug logging
-    console.log("🔍 Keyword extraction debug:", {
+    debug("🔍 Keyword extraction debug:", {
         jdLength: jd.length,
         jdPreview: jd.substring(0, 200) + "...",
         dictLength: DICT.length,
@@ -1383,7 +1384,7 @@ export async function POST(request: NextRequest) {
         const state = String(formData.get("state") || "");
 
         // Debug logging for job description
-        console.log("🔍 Job description received:", {
+        debug("🔍 Job description received:", {
             length: jobDescription.length,
             preview: jobDescription.substring(0, 300) + "...",
             hasContent: jobDescription.trim().length > 0

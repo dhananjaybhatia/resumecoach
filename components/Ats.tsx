@@ -1,5 +1,6 @@
 import Image from "next/image";
 import React, { useMemo, useEffect } from "react";
+import { debug } from "@/lib/debug";
 import {
   Accordion,
   AccordionContent,
@@ -495,9 +496,9 @@ const ATSBreakdown: React.FC<Props> = ({
 
   useEffect(() => {
     console.groupCollapsed("📊 ATS Breakdown — parsed");
-    console.log("Server details:", details);
-    console.log("Buckets:", buckets);
-    console.log("headlineScore:", headlineScore, "serverScore:", serverScore);
+    debug("Server details:", details);
+    debug("Buckets:", buckets);
+    debug("headlineScore:", headlineScore, "serverScore:", serverScore);
     console.groupEnd();
   }, [details, buckets, headlineScore, serverScore]);
 
@@ -632,7 +633,7 @@ const ATSBreakdown: React.FC<Props> = ({
 
                   // Debug logging for Keywords bucket (can be removed in production)
                   if (b.key === "Keywords") {
-                    console.log("🔍 Keywords bucket debug:", {
+                    debug("🔍 Keywords bucket debug:", {
                       message: b.message,
                       reasons: reasons,
                       reasonCount: reasons.length,
@@ -722,7 +723,7 @@ const ATSBreakdown: React.FC<Props> = ({
                             {reasons.map((r, i) => {
                               // Debug: log all reasons for Keywords bucket (can be removed in production)
                               if (b.key === "Keywords") {
-                                console.log(`🔍 Reason ${i}:`, {
+                                debug(`🔍 Reason ${i}:`, {
                                   original: r,
                                   lowercased: r.toLowerCase(),
                                   hasMissing: r
@@ -751,7 +752,7 @@ const ATSBreakdown: React.FC<Props> = ({
                                   .filter((k) => k.length > 0);
 
                                 // Debug logging for missing keywords (can be removed in production)
-                                console.log("🔍 Missing keywords debug:", {
+                                debug("🔍 Missing keywords debug:", {
                                   originalReason: r,
                                   missingText: missingText,
                                   keywords: keywords,
@@ -1044,7 +1045,7 @@ const ATSBreakdown: React.FC<Props> = ({
                   educationFeedback &&
                   (() => {
                     // Debug logging for education items
-                    console.log("🔍 Education section debug:", {
+                    debug("🔍 Education section debug:", {
                       educationItems: educationItems,
                       length: educationItems?.length || 0,
                       hasItems: (educationItems?.length || 0) > 0,
@@ -1198,7 +1199,7 @@ const ATSBreakdown: React.FC<Props> = ({
                 {b.key === "Experience" &&
                   (() => {
                     // Debug logging for quantified examples
-                    console.log("🔍 Experience section debug:", {
+                    debug("🔍 Experience section debug:", {
                       quantifiedExamples: quantifiedExamples,
                       length: quantifiedExamples.length,
                       hasExamples: quantifiedExamples.length > 0,

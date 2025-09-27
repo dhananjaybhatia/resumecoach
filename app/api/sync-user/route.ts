@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { debug } from "@/lib/debug";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { supabaseAdmin } from "@/lib/supabase";
 
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
 
         const avatar_url = user.imageUrl || "";
 
-        console.log("🔄 Syncing user to Supabase:", { userId, email, name });
+        debug("🔄 Syncing user to Supabase:", { userId, email, name });
 
         // First, try to find existing user by user_id
         const { data: existingUser } = await supabaseAdmin
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
 
         if (existingUser) {
             // Update existing user
-            console.log("📝 Updating existing user:", existingUser.id);
+            debug("📝 Updating existing user:", existingUser.id);
             const result = await supabaseAdmin
                 .from("users")
                 .update({
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
             error = result.error;
         } else {
             // Insert new user
-            console.log("➕ Creating new user");
+            debug("➕ Creating new user");
             const result = await supabaseAdmin
                 .from("users")
                 .insert({
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
 
             // If insert fails due to email constraint, try to find and update the existing user
             if (error && error.message.includes("duplicate key value violates unique constraint")) {
-                console.log("🔄 Email already exists, finding existing user by email");
+                debug("🔄 Email already exists, finding existing user by email");
                 const { data: existingByEmail } = await supabaseAdmin
                     .from("users")
                     .select("*")
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
                     .single();
 
                 if (existingByEmail) {
-                    console.log("📝 Updating existing user by email:", existingByEmail.id);
+                    debug("📝 Updating existing user by email:", existingByEmail.id);
                     const updateResult = await supabaseAdmin
                         .from("users")
                         .update({

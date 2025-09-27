@@ -9,6 +9,7 @@ import ScoreChart from "../../components/ScoreChart";
 import { Button } from "@/components/ui/button";
 import ResumeAnalysisPDF from "../../components/ResumeAnalysisPDF";
 import { pdf } from "@react-pdf/renderer";
+import { debug, debugOnce } from "@/lib/debug";
 
 /* =========================
    Build fingerprint
@@ -17,15 +18,7 @@ const __RESULTS_BUILD_ID__ = "results-v11";
 const DEBUG = process.env.NODE_ENV === "development";
 
 /* Dev-only: log once per key (avoids StrictMode double logs) */
-const dlogOnce = (() => {
-  const seen = new Set<string>();
-  return (key: string, ...args: any[]) => {
-    if (!DEBUG || seen.has(key)) return;
-    seen.add(key);
-    // eslint-disable-next-line no-console
-    console.log(...args);
-  };
-})();
+const dlogOnce = debugOnce;
 
 /* =========================
    LoadingDots
@@ -472,8 +465,8 @@ const ResultsPage = () => {
         },
       };
 
-      console.log("Transformed data for PDF:", transformedData);
-      console.log("ATS Breakdown for PDF:", transformedData.atsScore.breakdown);
+      debug("Transformed data for PDF:", transformedData);
+      debug("ATS Breakdown for PDF:", transformedData.atsScore.breakdown);
 
       const blob = await pdf(
         <ResumeAnalysisPDF analysisData={transformedData} />
@@ -556,12 +549,12 @@ ${data.analysis.analysisLists?.overallSummary || "No summary available"}
     try {
       setIsDownloading(true);
       await downloadPDFReport(analysisData);
-      console.log("PDF report generated successfully");
+      debug("PDF report generated successfully");
     } catch (e) {
       console.error("PDF generation failed, trying fallback:", e);
       try {
         await downloadSimplePrint(analysisData);
-        console.log("Fallback text report generated");
+        debug("Fallback text report generated");
       } catch (fallbackError) {
         console.error("Fallback also failed:", fallbackError);
         alert("Failed to generate report. Please try again.");
@@ -686,7 +679,7 @@ ${data.analysis.analysisLists?.overallSummary || "No summary available"}
         );
     }
 
-    console.log("🔍 Resume bullets extraction debug:", {
+    debug("🔍 Resume bullets extraction debug:", {
       analysisData: analysisData?.analysis?.pack,
       professionalExperience:
         analysisData?.analysis?.pack?.professionalExperience,
@@ -698,15 +691,11 @@ ${data.analysis.analysisLists?.overallSummary || "No summary available"}
     });
 
     return bullets;
-  }, [
-    analysisData?.analysis?.pack?.professionalExperience,
-    analysisData?.analysis?.pack?.keyProjects,
-    parsedAnalysis?.professionalExperience,
-  ]);
+  }, [analysisData?.analysis?.pack, parsedAnalysis?.professionalExperience]);
 
   const quantifiedExamples = useMemo(() => {
     const examples = extractQuantifiedExamples(resumeBullets, 3);
-    console.log("🔍 Quantified examples extraction debug:", {
+    debug("🔍 Quantified examples extraction debug:", {
       resumeBullets: resumeBullets,
       bulletsCount: resumeBullets.length,
       extractedExamples: examples,
@@ -759,10 +748,10 @@ ${data.analysis.analysisLists?.overallSummary || "No summary available"}
   );
 
   // Debug logging for keyword data
-  console.log("🔍 Core Matched Raw:", coreMatchedRaw);
-  console.log("🔍 Core Matched Processed:", coreMatched);
-  console.log("🔍 Core Missing Raw:", coreMissingRaw);
-  console.log("🔍 Core Missing Processed:", coreMissing);
+  debug("🔍 Core Matched Raw:", coreMatchedRaw);
+  debug("🔍 Core Matched Processed:", coreMatched);
+  debug("🔍 Core Missing Raw:", coreMissingRaw);
+  debug("🔍 Core Missing Processed:", coreMissing);
 
   const jdEducationGaps = useMemo(
     () => coreMissing.filter(isEducationLine),
@@ -777,9 +766,9 @@ ${data.analysis.analysisLists?.overallSummary || "No summary available"}
         )
         .map((s) => normalizeJDItems([s])[0])
     );
-    console.log("🔍 Desirable Set:", desirableSet);
+    debug("🔍 Desirable Set:", desirableSet);
     const result = coreMissing.filter((x) => desirableSet.has(x));
-    console.log("🔍 JD Missing Desirable:", result);
+    debug("🔍 JD Missing Desirable:", result);
     return result;
   }, [coreMissing, coreMissingRaw]);
 
@@ -787,7 +776,7 @@ ${data.analysis.analysisLists?.overallSummary || "No summary available"}
     const result = coreMissing.filter(
       (x) => !jdMissingDesirable.includes(x) && !jdEducationGaps.includes(x)
     );
-    console.log("🔍 JD Missing Required:", result);
+    debug("🔍 JD Missing Required:", result);
     return result;
   }, [coreMissing, jdMissingDesirable, jdEducationGaps]);
 
