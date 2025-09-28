@@ -2045,7 +2045,7 @@ ATS BREAKDOWN (REQUIRED)
   * Bootcamps + practical experience = equivalent to formal education for technical roles
   * Focus on WHAT the candidate can DO, not just the degree title
   * 6+ years practical experience outweighs degree title mismatches
-  * Use these relevance levels: "perfect match", "strong equivalent", "partially relevant", "missing required background"
+  * Use these relevance levels: "perfect match", "strong equivalent", "missing required background"
 
 - Education scoring (0-10) must reflect REAL hiring practices, not just degree title matching.
 - Also return scores.ats.feedback as EXACTLY six lines in this order and format:
@@ -2396,14 +2396,14 @@ Return ONLY the JSON object. No commentary.
                         reasons = ["education present", "perfectly matches Job Description requirements"];
                         score = 10;
                     } else if (/\b(bachelor|degree|diploma)\b/i.test(cvTxt)) {
-                        reasons = ["education present", "partially relevant"];
+                        reasons = ["education present"];
                         score = Math.max(score, 6); // don’t under-score if degree exists but not in requested list
                     } else {
                         reasons = ["education present", "missing required degree"];
                         score = Math.min(score, 4);
                     }
                 } else {
-                    reasons = ["education present", "partially relevant"];
+                    reasons = ["education present"];
                     score = Math.max(score, 6);
                 }
 

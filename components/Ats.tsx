@@ -247,9 +247,9 @@ const IMPROVEMENT_TIPS: Record<BucketKey, string[]> = {
     "Tailor it to the specific job you're applying for",
   ],
   Skills: [
+    "Add missing skills from the job description to improve your match score",
     "Include both hard and soft skills",
     "Match skills to those mentioned in the job description",
-    "Organize skills into categories if you have many",
     "Place most relevant skills near the top",
     "Include technical proficiencies and tools",
   ],
@@ -268,7 +268,7 @@ const IMPROVEMENT_TIPS: Record<BucketKey, string[]> = {
     "Include graduation year (or expected graduation)",
   ],
   Keywords: [
-    "Carefully review the job description for important keywords",
+    "Add missing keywords from the job description to improve your match score",
     "Include both required and desirable keywords",
     "Use variations of keywords (e.g., 'manage', 'management', 'manager')",
     "Incorporate keywords naturally throughout your resume",

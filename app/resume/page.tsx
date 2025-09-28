@@ -300,7 +300,6 @@ const ResumePage = () => {
       }
 
       const result = await response.json();
-      console.log("🚨 RESUME PAGE: API Response received", result);
       debug("✅ Full API Response:", result);
       debug("🔍 About to check result.success:", result.success);
 
