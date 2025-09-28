@@ -1,6 +1,7 @@
 "use client";
 
-import { PricingTable } from "@clerk/nextjs";
+import { PricingTable, useAuth } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 
@@ -13,19 +14,27 @@ const Subscription = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showSecondText, setShowSecondText] = useState(false);
 
+  const router = useRouter();
+  const { isLoaded, has } = useAuth();
+
+  // If the user already has the feature, send them back to the app
+  useEffect(() => {
+    if (!isLoaded) return;
+    (async () => {
+      const isSubscribed = await has({ feature: "unlimited_scans" });
+      if (isSubscribed) router.replace("/resume");
+    })();
+  }, [isLoaded, has, router]);
+
   useEffect(() => {
     if (currentIndex < typingText.length) {
       const timeout = setTimeout(() => {
         setCurrentText((prev) => prev + typingText[currentIndex]);
         setCurrentIndex((prev) => prev + 1);
-      }, 100); // Typing speed
-
+      }, 100);
       return () => clearTimeout(timeout);
     } else {
-      // Show second text after typing is complete
-      setTimeout(() => {
-        setShowSecondText(true);
-      }, 500);
+      setTimeout(() => setShowSecondText(true), 500);
     }
   }, [currentIndex, typingText]);
 
@@ -43,12 +52,11 @@ const Subscription = () => {
         </div>
 
         <div style={{ maxWidth: "800px", margin: "0 auto", padding: "0 1rem" }}>
-          <PricingTable />
+          {/* After successful purchase, Clerk will return here */}
+          <PricingTable redirectUrl="/resume" />
         </div>
 
-        {/* Typing animation message for rate-limited users */}
         <div className="mt-16 text-center">
-          {/* Typing animation with ticker */}
           <motion.h1
             className="text-2xl sm:text-5xl md:text-4xl font-bold text-gray-800 mb-4"
             initial={{ opacity: 0 }}
@@ -65,7 +73,6 @@ const Subscription = () => {
             </motion.span>
           </motion.h1>
 
-          {/* Second text that appears slowly */}
           {showSecondText && (
             <motion.p
               className="text-lg text-gray-600 mb-4"
