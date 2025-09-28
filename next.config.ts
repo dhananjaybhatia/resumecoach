@@ -1,3 +1,4 @@
+import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -44,4 +45,15 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Sentry configuration with minimal settings to avoid deployment issues
+export default withSentryConfig(nextConfig, {
+  org: "student-hob",
+  project: "saas",
+  silent: true, // Disable Sentry logs during build
+  widenClientFileUpload: true,
+  disableLogger: true,
+  automaticVercelMonitors: false, // Disable to avoid conflicts
+  hideSourceMaps: true, // Hide source maps in production
+  disableServerWebpackPlugin: false,
+  disableClientWebpackPlugin: false,
+});
