@@ -18,13 +18,14 @@ const Subscription = () => {
   const { isLoaded, has } = useAuth();
 
   // If the user already has the feature, send them back to the app
-  useEffect(() => {
-    if (!isLoaded) return;
-    (async () => {
-      const isSubscribed = has({ feature: "unlimited_scans" });
-      if (isSubscribed) router.replace("/resume");
-    })();
-  }, [isLoaded, has, router]);
+  // Temporarily disabled for testing
+  // useEffect(() => {
+  //   if (!isLoaded) return;
+  //   (async () => {
+  //     const isSubscribed = has({ feature: "unlimited_scans" });
+  //     if (isSubscribed) router.replace("/resume");
+  //   })();
+  // }, [isLoaded, has, router]);
 
   useEffect(() => {
     if (currentIndex < typingText.length) {
