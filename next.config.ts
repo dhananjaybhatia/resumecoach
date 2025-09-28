@@ -1,4 +1,3 @@
-import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -43,16 +42,6 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-
-  // Remove env from here - keep them in .env.local only
-  // The environment variables are automatically available
 };
 
-export default withSentryConfig(nextConfig, {
-  org: "student-hob",
-  project: "saas",
-  silent: !process.env.CI,
-  widenClientFileUpload: true,
-  disableLogger: true,
-  automaticVercelMonitors: true
-});
+export default nextConfig;

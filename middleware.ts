@@ -10,6 +10,7 @@ const isPublicRoute = createRouteMatcher([
     '/results',
     '/resume', // Resume upload page - accessible to anonymous users
     '/subscription', // Subscription page - accessible to anonymous users
+    '/test', // Test page - accessible to anonymous users
     '/sign-in(.*)', // Clerk sign-in page and all its sub-routes
     '/api/analyze-resume', // Public API route
     '/api/webhook/stripe', // Stripe webhook

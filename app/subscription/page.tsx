@@ -21,7 +21,7 @@ const Subscription = () => {
   useEffect(() => {
     if (!isLoaded) return;
     (async () => {
-      const isSubscribed = await has({ feature: "unlimited_scans" });
+      const isSubscribed = has({ feature: "unlimited_scans" });
       if (isSubscribed) router.replace("/resume");
     })();
   }, [isLoaded, has, router]);
