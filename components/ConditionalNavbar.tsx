@@ -1,16 +1,9 @@
 "use client";
 
-import { usePathname } from "next/navigation";
 import Navbar from "./Navbar";
 
 const ConditionalNavbar = () => {
-  const pathname = usePathname();
-
-  // Hide navbar on home page
-  if (pathname === "/") {
-    return null;
-  }
-
+  // Always show navbar
   return <Navbar />;
 };
 
