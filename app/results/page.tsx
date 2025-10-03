@@ -631,6 +631,14 @@ ${data.analysis.analysisLists?.overallSummary || "No summary available"}
 
     try {
       const data = JSON.parse(raw) as AnalysisData;
+
+      // Temporary: Always log full data for debugging
+      const dataSize = JSON.stringify(data).length;
+      console.log(
+        `🔍 FULL ANALYSIS DATA (always visible) - Size: ${dataSize} chars:`,
+        JSON.stringify(data, null, 2)
+      );
+
       debug("🔍 Parsed analysis data:", {
         hasAnalysis: !!data.analysis,
         hasPack: !!data.analysis?.pack,

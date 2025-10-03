@@ -246,37 +246,41 @@ function validateResumeContent(text: string): { isValid: boolean; issues: string
 function isLikelyRealJD(jdText: string): boolean {
     const text = jdText.toLowerCase().trim();
 
-    // Check minimum meaningful content
+    // Check minimum meaningful content - be more lenient
     const meaningfulWords = text.split(/\s+/).filter(word =>
         word.length > 3 && /[a-zA-Z]/.test(word)
     ).length;
 
-    if (meaningfulWords < 15) {
-        return false; // Too short to be a real JD
+    if (meaningfulWords < 10) {
+        return false; // Still need some content
     }
 
-    // Check for JD-like structure (relaxed criteria)
-    const hasJDSections = /(requirements?|qualifications?|skills?|responsibilities?|experience|education|duties?|must have|should have)/i.test(text);
+    // More flexible JD pattern matching
+    const hasJDSections = /(requirements?|qualifications?|skills?|experience|education|duties?|must have|should have|expertise in|strong experience|ability to)/i.test(text);
 
     // Check for job-related content (more flexible)
-    const hasJobContent = /(role|position|job|looking for|seek|hiring|join our|team|company|organization)/i.test(text);
+    const hasJobContent = /(role|position|job|looking for|seek|hiring|join our|team|company|organization|analyst|developer|engineer|manager)/i.test(text);
 
-    // Check for action-oriented language
+    // NEW: Check for industry-specific keywords (common across all JDs)
+    const hasIndustryContent = /(experience|skills|knowledge|proficient|familiar|certification|degree|bachelor|master|phd|licens|certified|training|background|expertise|qualification)/i.test(text);
+
+    // Check for action-oriented language - more lenient
     const hasActionLanguage = text.split(/\s+/).filter(word =>
-        /\b(manage|develop|create|build|analyze|support|lead|coordinate|implement|design)\w*/i.test(word)
-    ).length > 5;
+        /\b(manage|develop|create|build|analyze|analyse|support|lead|coordinate|implement|design|collaborat|translate|solve|optimize|optimise|ensure)\w*/i.test(word)
+    ).length > 3; // Reduced from 5 to 3
 
     // Multiple indicators increase confidence
     const indicators = [
         hasJDSections,
         hasJobContent,
+        hasIndustryContent, // NEW indicator - industry agnostic
         hasActionLanguage,
-        meaningfulWords > 50, // Substantial content
+        meaningfulWords > 25, // Reduced from 50 to 25
     ];
 
     const confidenceScore = indicators.filter(Boolean).length;
 
-    // Require at least 2 out of 4 indicators to be true
+    // Require at least 2 out of 5 indicators to be true (more flexible)
     return confidenceScore >= 2;
 }
 
@@ -1146,23 +1150,22 @@ type HeurParts = {
     structure25: number;  // your internal structure score (0..25)
     summary20: number;    // 0..20
     skills20: number;     // 0..20
-    experience20: number; // 0..20
-    keywords7: number;    // 0..7
+    experience25: number; // 0..25 - Updated to match actual calculation
+    keywords7: number;    // 0..7 - Deprecated but kept for compatibility
 };
 
 type AtsBreakdownItem = { label: string; score: number; max: number; reasons?: string[] };
 /**
  * Convert internal heuristic parts → UI breakdown buckets totaling 100:
- *  20 + 20 + 20 + 20 + 10 + 10
+ *  20 + 20 + 25 + 25 + 10
  */
 function toAtsBreakdown(parts: HeurParts, hasEducation: boolean): AtsBreakdownItem[] {
     return [
         { label: "Structure", score: Math.round((parts.structure25 / 25) * 20), max: 20 },
         { label: "Summary", score: parts.summary20, max: 20 },
-        { label: "Skills", score: parts.skills20, max: 20 },
-        { label: "Experience", score: parts.experience20, max: 20 },
+        { label: "Skills", score: Math.round((parts.skills20 / 20) * 25), max: 25 },
+        { label: "Experience", score: parts.experience25, max: 25 },
         { label: "Education", score: hasEducation ? 10 : 0, max: 10 },
-        { label: "Keywords", score: Math.round((parts.keywords7 / 7) * 10), max: 10 },
     ];
 }
 function rescaleAtsBreakdown(breakdown: AtsBreakdownItem[], targetTotal: number): AtsBreakdownItem[] {
@@ -1185,7 +1188,7 @@ function computeATSHeuristic(
         structure25: number;  // 0–25 (we scale to 20 for UI)
         summary20: number;    // 0–20
         skills20: number;     // 0–20
-        experience20: number; // 0–20
+        experience25: number; // 0–25 - Updated to match actual calculation
         keywords7: number;    // 0–7  (we scale to 10 for UI)
     };
 } {
@@ -1258,20 +1261,38 @@ function computeATSHeuristic(
     if (hasKeySkill) summaryReasons.push("mentions a resume skill");
 
 
-    // ----- Skills (cap 20) -----
+    // ----- Skills (cap 25) -----
     let skillsScore = 0;
-    // Use robust slice + atomic tokenizer instead of naive split
+
+    // Try to use AI-analyzed skills first (more accurate), fall back to raw text extraction
+    let uniqCount = 0;
+
+    // Check if we have AI-analyzed skills data (this will be available later in the process)
+    // For now, use the more robust raw text extraction but with better fallback
     const skillsExcerptForScore = extractWithFallback(resumeText, "skills", 0);
     const atomicSkillsForScore = extractAtomicSkills(skillsExcerptForScore);
-    const uniqCount = new Set(
+    uniqCount = new Set(
         atomicSkillsForScore.map((s) => normalize(s)).filter(Boolean)
     ).size;
 
-    // cap at 12 → map to 0..20
-    skillsScore = Math.min(20, Math.round((Math.min(uniqCount, 12) / 12) * 20));
+    // If raw extraction fails, try a more lenient approach
+    if (uniqCount === 0) {
+        // Fallback: extract skills from the entire resume text using a broader pattern
+        const broadSkillsPattern = /(?:^|\n)\s*(?:skills?|key\s+skills|technical\s+skills|competenc(?:y|ies)|core\s+skills|technical\s+proficiencies|tools\s*&?\s*technologies|tech\s+stack|capabilit(?:y|ies))\s*:?\s*\n([\s\S]*?)(?=\n\s*(?:experience|education|projects|employment|work|$))/i;
+        const match = resumeText.match(broadSkillsPattern);
+        if (match && match[1]) {
+            const fallbackSkills = extractAtomicSkills(match[1]);
+            uniqCount = new Set(
+                fallbackSkills.map((s) => normalize(s)).filter(Boolean)
+            ).size;
+        }
+    }
+
+    // cap at 12 → map to 0..25
+    skillsScore = Math.min(25, Math.round((Math.min(uniqCount, 12) / 12) * 25));
     score += skillsScore;
 
-    // ----- Experience (cap 20) -----
+    // ----- Experience (cap 25) -----
     const expTxt =
         (extractSection(resumeText, "experience") || resumeText).toLowerCase();
     const actionHits =
@@ -1285,25 +1306,18 @@ function computeATSHeuristic(
             /(\$[\d,]+|\d+(?:\.\d+)?%|\b\d{1,3}(?:,\d{3})+\b)/g
         ) || []).length;
     const expScore = Math.min(
-        20,
-        Math.round(Math.min(actionHits * 2 + metricHits * 2, 20))
+        25,
+        Math.round(Math.min(actionHits * 2.5 + metricHits * 2.5, 25))
     );
     score += expScore;
 
-    // ----- Keywords (cap 7) -----
-    const hasCore = /\b(sql|excel|tableau|power\s*bi|python|looker|snowflake|redshift|bigquery)\b/i.test(
-        resumeText
-    );
-    const hasR = /(^|[^A-Za-z])R([^A-Za-z]|$)/.test(resumeText);
-    const keywordScore = hasCore || hasR ? 7 : 3;
-    score += keywordScore;
+    // Keywords scoring removed for performance optimization
 
     // Feedback lines (still useful for UI text parsing)
     fb.push(`Structure: ${structure}/25`);
     fb.push(`Summary: ${summaryScore}/20`);
-    fb.push(`Skills: ${skillsScore}/20`);
-    fb.push(`Experience: ${expScore}/20`);
-    fb.push(`Keywords: ${keywordScore}/7`);
+    fb.push(`Skills: ${skillsScore}/25`);
+    fb.push(`Experience: ${expScore}/25`);
 
     return {
         score: Math.min(100, score),
@@ -1312,8 +1326,8 @@ function computeATSHeuristic(
             structure25: structure,
             summary20: summaryScore,
             skills20: skillsScore,
-            experience20: expScore,
-            keywords7: keywordScore,
+            experience25: expScore,
+            keywords7: 0, // Deprecated but kept for compatibility
         },
     };
 }
@@ -1863,7 +1877,6 @@ export async function POST(request: NextRequest) {
                                                         "Skills",
                                                         "Experience",
                                                         "Education",
-                                                        "Keywords",
                                                     ],
                                                 },
                                                 score: { type: "integer", minimum: 0, maximum: 100 },
@@ -2035,7 +2048,7 @@ TOOLS NORMALISATION
 - If a candidate shows evidence of capabilities (e.g., fraud detection → statistical analysis, patient monitoring → clinical skills), consider the technical requirement MET regardless of degree title.
 
 ATS BREAKDOWN (REQUIRED)
-- Provide scores.ats.breakdown with EXACTLY these six labels: Structure (max 20), Summary (max 20), Skills (max 20), Experience (max 20), Education (max 10), Keywords (max 10).
+- Provide scores.ats.breakdown with EXACTLY these five labels: Structure (max 20), Summary (max 20), Skills (max 25), Experience (max 25), Education (max 10).
 - Each item MUST include "reasons": array of short phrases explaining the score.
 - Structure reasons must mention: section completeness, contact info presence, formatting effectiveness, organisational clarity.
 - Summary reasons MUST be booleans from the **summary text only**: "has summary", "years mentioned", "has quantified outcome", "mentions a resume skill".
@@ -2048,13 +2061,12 @@ ATS BREAKDOWN (REQUIRED)
   * Use these relevance levels: "perfect match", "strong equivalent", "missing required background"
 
 - Education scoring (0-10) must reflect REAL hiring practices, not just degree title matching.
-- Also return scores.ats.feedback as EXACTLY six lines in this order and format:
+- Also return scores.ats.feedback as EXACTLY five lines in this order and format:
   "Structure: [score]/20 — …"
   "Summary: [score]/20 — …"
-  "Skills: [score]/20 — …"
-  "Experience: [score]/20 — …"
+  "Skills: [score]/25 — …"
+  "Experience: [score]/25 — …"
   "Education: [score]/10 — …"
-  "Keywords: [score]/10 — Matches X% of Job Description keywords; Missing: [list 3–7 critical tools/skills]"
 
 SCORING RUBRIC (0–100 ONLY)
 - mustHave, coreSkills, domainTitleAdjacency, seniority, recency, niceToHaves are integers 0–100.
@@ -2133,7 +2145,7 @@ TASKS
 3) Score ATS (score + the six-item breakdown with reasons) and Job Match; fill all bucket scores.
 4) Provide evidence arrays:
    - "matched": for each matched item, include up to 3 brief resume_quotes and up to 3 jd_quotes.
-   - "missing": for ALL missing items, include up to 3 jd_quotes. Do not limit the number of missing items - include every skill/requirement that is missing from the resume.
+   - "missing": for ALL missing items, include up to 3 jd_quotes. IMPORTANT: Missing items should be clean, specific keywords/tools/skills (e.g., "Power BI", "SQL", "Project Management") - NOT sentence fragments like "Provide data solutions" or "Highly desired experience". Focus on concrete, actionable missing skills.
 
 Return ONLY the JSON object. No commentary.
 `.trim();
@@ -2234,25 +2246,27 @@ Return ONLY the JSON object. No commentary.
         const matchScore = clamp100(matchScoreNum, 50);
 
         // Use model breakdown directly; clamp and normalise
-        const atsBreakdown =
-            modelBreakdown.map((b: any) => ({
+        const atsBreakdown = Array.isArray(modelBreakdown) && modelBreakdown.length > 0
+            ? modelBreakdown.map((b: any) => ({
                 label: String(b?.label || ""),
                 score: clamp100(b?.score ?? 0, 0),
                 max: Math.max(1, Math.min(100, Math.round(Number(b?.max ?? 20)))),
             }))
-                // keep only the six expected labels in a stable order
+                // keep only the five expected labels in a stable order
                 .filter((b: any) =>
-                    ["Structure", "Summary", "Skills", "Experience", "Education", "Keywords"].includes(b.label)
-                );
+                    ["Structure", "Summary", "Skills", "Experience", "Education"].includes(b.label)
+                )
+            : [];
 
         // If for any reason the model missed some bucket(s), fill with zeros (doesn't rescale)
-        const order = ["Structure", "Summary", "Skills", "Experience", "Education", "Keywords"];
+        const order = ["Structure", "Summary", "Skills", "Experience", "Education"];
         const atbMap = new Map(atsBreakdown.map((x: any) => [x.label, x]));
         const atsBreakdownCompleted = order.map((label) =>
             atbMap.get(label) || {
                 label,
                 score: 0,
-                max: label === "Education" || label === "Keywords" ? 10 : 20,
+                max: label === "Education" ? 10 : label === "Skills" || label === "Experience" ? 25 : 20,
+                reasons: [],
             }
         );
 
@@ -2310,20 +2324,6 @@ Return ONLY the JSON object. No commentary.
 
 
 
-        {
-            const kwScore = Math.min(10, Math.round(kw.pct / 10));
-            const reasons = [
-                `matches ${kw.pct}% of JD keywords`,
-                displayMissing.length ? `missing: ${displayMissing.slice(0, 5).join(", ")}` : "no critical gaps"
-            ];
-            const i = atsBreakdownCompleted.findIndex(b => b.label === "Keywords");
-            const kwItem = { label: "Keywords", score: kwScore, max: 10, reasons };
-            if (i >= 0) atsBreakdownCompleted[i] = kwItem; else atsBreakdownCompleted.push(kwItem);
-
-            const kwLine = `Keywords: ${kwScore}/10 — Matches ${kw.pct}% of Job Description keywords; Missing: ${displayMissing.slice(0, 5).join(", ") || "—"}`;
-            const fbi = feedbackLines.findIndex((l: string) => /^Keywords:\s*/.test(l));
-            if (fbi >= 0) feedbackLines[fbi] = kwLine; else feedbackLines.push(kwLine);
-        }
 
         matchedSkills = displayMatched;
         missingSkills = displayMissing;
@@ -2332,27 +2332,7 @@ Return ONLY the JSON object. No commentary.
         // --- Deterministic reasons for Skills / Experience / Education + enforce 6 feedback lines ---
         const idx = (label: string) => atsBreakdownCompleted.findIndex(b => b.label === label);
 
-        // Skills reasons
-        // In "Skills reasons" block
-        const skillsIdx = idx("Skills");
-        if (skillsIdx >= 0) {
-            const skillsExcerptX = extractWithFallback(resumeText, "skills", 0);
-            const atomicX = extractAtomicSkills(skillsExcerptX);
-            const uniqX = new Set(atomicX.map(s => normalize(s))).size;
-            const skillsScoreDet = Math.min(20, Math.round((Math.min(uniqX, 12) / 12) * 20));
-            const skillsReasons = [
-                uniqX ? `extracted ${uniqX} skill tokens` : "no skill tokens found",
-                uniqX >= 8 ? "broad skill coverage" : "limited skill variety",
-            ];
-            atsBreakdownCompleted[skillsIdx] = {
-                ...atsBreakdownCompleted[skillsIdx],
-                score: skillsScoreDet,
-                reasons: skillsReasons,
-            };
-            const line = `Skills: ${skillsScoreDet}/20 — ${skillsReasons.join("; ")}`;
-            const fbi = feedbackLines.findIndex((l: string) => /^Skills:\s*/i.test(l));
-            if (fbi >= 0) feedbackLines[fbi] = line; else feedbackLines.push(line);
-        }
+        // Skills reasons - will be updated after pack is defined
 
 
         // Experience reasons
@@ -2366,8 +2346,14 @@ Return ONLY the JSON object. No commentary.
                     actionHits2 ? `${actionHits2} action verbs` : "few action verbs",
                     metricHits2 ? `${metricHits2} quantified metrics` : "no quantified metrics"
                 ];
-                (atsBreakdownCompleted[expIdx2] as any).reasons = expReasons;
-                const line = `Experience: ${atsBreakdownCompleted[expIdx2].score}/20 — ${expReasons.join("; ")}`;
+                // Override the score with deterministic calculation
+                const deterministicExpScore = Math.min(25, Math.round(Math.min(actionHits2 * 2.5 + metricHits2 * 2.5, 25)));
+                atsBreakdownCompleted[expIdx2] = {
+                    ...atsBreakdownCompleted[expIdx2],
+                    score: deterministicExpScore,
+                    reasons: expReasons,
+                };
+                const line = `Experience: ${deterministicExpScore}/25 — ${expReasons.join("; ")}`;
                 const fbi = feedbackLines.findIndex((l: string) => /^Experience:\s*/i.test(l));
                 if (fbi >= 0) feedbackLines[fbi] = line; else feedbackLines.push(line);
             }
@@ -2416,9 +2402,9 @@ Return ONLY the JSON object. No commentary.
         }
 
 
-        // Ensure we return exactly six feedback lines, in order
+        // Ensure we return exactly five feedback lines, in order
         {
-            const orderLines = ["Structure", "Summary", "Skills", "Experience", "Education", "Keywords"];
+            const orderLines = ["Structure", "Summary", "Skills", "Experience", "Education"];
             feedbackLines = orderLines.map(lbl => {
                 const re = new RegExp(`^${lbl}:\\s*`, "i");
                 const found = feedbackLines.find(l => re.test(l));
@@ -2445,6 +2431,44 @@ Return ONLY the JSON object. No commentary.
             educationAndCertification: toEduArr(r.educationAndCertification),
             toolsAndTechnologies: uniqNorm(toArr(r.toolsAndTechnologies).map(mapToolName)),
         };
+
+        // Update Skills scoring with AI-analyzed skills count
+        const skillsIdx = atsBreakdownCompleted.findIndex(b => b.label === "Skills");
+        if (skillsIdx >= 0) {
+            const aiSkillsCount = pack.keySkills?.length || 0;
+            let uniqX = aiSkillsCount;
+
+            // Fallback to raw extraction only if AI analysis failed
+            if (uniqX === 0) {
+                const skillsExcerptX = extractWithFallback(resumeText, "skills", 0);
+                const atomicX = extractAtomicSkills(skillsExcerptX);
+                uniqX = new Set(atomicX.map(s => normalize(s))).size;
+
+                // If raw extraction fails, try a more lenient approach
+                if (uniqX === 0) {
+                    const broadSkillsPattern = /(?:^|\n)\s*(?:skills?|key\s+skills|technical\s+skills|competenc(?:y|ies)|core\s+skills|technical\s+proficiencies|tools\s*&?\s*technologies|tech\s+stack|capabilit(?:y|ies))\s*:?\s*\n([\s\S]*?)(?=\n\s*(?:experience|education|projects|employment|work|$))/i;
+                    const match = resumeText.match(broadSkillsPattern);
+                    if (match && match[1]) {
+                        const fallbackSkills = extractAtomicSkills(match[1]);
+                        uniqX = new Set(fallbackSkills.map(s => normalize(s))).size;
+                    }
+                }
+            }
+
+            const skillsScoreDet = Math.min(25, Math.round((Math.min(uniqX, 12) / 12) * 25));
+            const skillsReasons = [
+                aiSkillsCount > 0 ? `AI detected ${aiSkillsCount} skills` : (uniqX ? `extracted ${uniqX} skill tokens` : "no skill tokens found"),
+                uniqX >= 8 ? "broad skill coverage" : "limited skill variety",
+            ];
+            atsBreakdownCompleted[skillsIdx] = {
+                ...atsBreakdownCompleted[skillsIdx],
+                score: skillsScoreDet,
+                reasons: skillsReasons,
+            };
+            const line = `Skills: ${skillsScoreDet}/25 — ${skillsReasons.join("; ")}`;
+            const fbi = feedbackLines.findIndex((l: string) => /^Skills:\s*/i.test(l));
+            if (fbi >= 0) feedbackLines[fbi] = line; else feedbackLines.push(line);
+        }
 
         // Build analysis lists (passthrough)
         const analysisLists = {

@@ -13,7 +13,7 @@ const cleanKeyword = (keyword: string): string => {
   if (!keyword) return "";
 
   // Remove common sentence endings and parentheticals
-  return keyword
+  let cleaned = keyword
     .replace(
       /\b(?:is|are|was|were|has|have|had|will|would|could|should|must|can|may|might)\b.*$/i,
       ""
@@ -31,6 +31,31 @@ const cleanKeyword = (keyword: string): string => {
     .replace(/\s*[,-]\s*$/, "") // Remove trailing commas/dashes
     .replace(/\s+/g, " ") // Normalize whitespace
     .trim();
+
+  // Filter out bad keywords (sentence fragments, generic terms, etc.)
+  const badPatterns = [
+    /^(about you|data integrity|team capability|database systems|cfo|about you ca|cpa)$/i,
+    /^(some|like|and|or|the|a|an|is|are|was|were|has|have|had|will|would|could|should|must|can|may|might)$/i,
+    /^(provide|deliver|create|build|develop|manage|lead|support|ensure|implement|design|analyze|optimize|solve|coordinate|collaborate|translate|integrate|drive|inform|map|automate)\s/i,
+    /\b(highly desired|preferred|required|essential|necessary|important|critical|mandatory)\b/i,
+    /^(financial industry|healthcare industry|tech industry|manufacturing industry)\s/i,
+    /\b(solutions?|strategies?|approaches?|methods?|techniques?|processes?|systems?|tools?|platforms?|frameworks?|methodologies?)\s*$/i,
+    /^(experience working with|experience in|experience with|experience of)\s/i,
+    /^(strong|solid|excellent|good|basic|intermediate|advanced)\s/i,
+    /^(ability to|capability to|skills in|knowledge of|understanding of)\s/i,
+  ];
+
+  // If it matches bad patterns, return empty string
+  if (badPatterns.some((pattern) => pattern.test(cleaned))) {
+    return "";
+  }
+
+  // Filter out very short or very long keywords
+  if (cleaned.length < 3 || cleaned.length > 50) {
+    return "";
+  }
+
+  return cleaned;
 };
 
 export type ATSDetails = {
@@ -59,8 +84,7 @@ type BucketKey =
   | "Summary"
   | "Skills"
   | "Experience"
-  | "Education"
-  | "Keywords";
+  | "Education";
 
 type Bucket = { key: BucketKey; got: number; max: number; message: string };
 
@@ -70,16 +94,14 @@ const BUCKET_ORDER: BucketKey[] = [
   "Skills",
   "Experience",
   "Education",
-  "Keywords",
 ];
 
 const DEFAULT_MAX: Record<BucketKey, number> = {
   Structure: 20,
   Summary: 20,
-  Skills: 20,
-  Experience: 20,
+  Skills: 25,
+  Experience: 25,
   Education: 10,
-  Keywords: 10,
 };
 
 /* ---------------------------
@@ -102,8 +124,6 @@ const toKey = (raw: string): BucketKey | null => {
       return "Experience";
     case "education":
       return "Education";
-    case "keywords":
-      return "Keywords";
     default:
       return null;
   }
@@ -133,17 +153,12 @@ const Pill: React.FC<{ kind: "ok" | "miss"; children: React.ReactNode }> = ({
 );
 
 // Break a semicolon/pipe/comma/• separated reason string into tokens
-const splitReasons = (msg: string, bucket?: BucketKey): string[] => {
+const splitReasons = (msg: string): string[] => {
   const s = String(msg || "");
-  return bucket === "Keywords"
-    ? s
-        .split(/[;•|]+/g)
-        .map((t) => t.trim())
-        .filter(Boolean) // Split on semicolon/pipe/bullet, but keep commas intact for keyword parsing
-    : s
-        .split(/[;•|,]+/g)
-        .map((t) => t.trim())
-        .filter(Boolean);
+  return s
+    .split(/[;•|,]+/g)
+    .map((t) => t.trim())
+    .filter(Boolean);
 };
 
 // Summary achievement checks (derived from feedback reasons produced on server)
@@ -247,18 +262,20 @@ const IMPROVEMENT_TIPS: Record<BucketKey, string[]> = {
     "Tailor it to the specific job you're applying for",
   ],
   Skills: [
-    "Add missing skills from the job description to improve your match score",
-    "Include both hard and soft skills",
-    "Match skills to those mentioned in the job description",
-    "Place most relevant skills near the top",
-    "Include technical proficiencies and tools",
+    "Add missing skills and tools mentioned in the job description",
+    "Include software, tools, and professional certifications relevant to your field",
+    "List specific proficiencies (e.g., 'Advanced Excel', 'QuickBooks Expert', 'CPA Certified')",
+    "Place most relevant skills near the top of your skills section",
+    "Include both hard skills (tools, software) and relevant soft skills",
+    "Highlight any professional certifications or specialized training",
   ],
   Experience: [
     "Use action verbs to start each bullet point",
     "Focus on achievements rather than responsibilities",
     "Quantify your accomplishments with numbers",
-    "Include relevant keywords from the job description",
+    "Include relevant industry keywords and terminology",
     "Show career progression with increasing responsibility",
+    "Highlight transferable skills and leadership experience",
   ],
   Education: [
     "List your highest degree first",
@@ -266,13 +283,6 @@ const IMPROVEMENT_TIPS: Record<BucketKey, string[]> = {
     "Add certifications and professional development",
     "Mention honors or awards if applicable",
     "Include graduation year (or expected graduation)",
-  ],
-  Keywords: [
-    "Add missing keywords from the job description to improve your match score",
-    "Include both required and desirable keywords",
-    "Use variations of keywords (e.g., 'manage', 'management', 'manager')",
-    "Incorporate keywords naturally throughout your resume",
-    "Highlight industry-specific terminology",
   ],
 };
 
@@ -364,9 +374,7 @@ type Props = {
   details: ATSDetails | number | null | undefined;
   resumeSkills?: string[];
   quantifiedExamples?: string[];
-  jdMatchedCore?: string[];
   jdMissingRequired?: string[];
-  jdMissingDesirable?: string[];
   educationGaps?: string[];
   educationItems?: Array<{
     name: string;
@@ -379,57 +387,38 @@ const ATSBreakdown: React.FC<Props> = ({
   details,
   resumeSkills = [],
   quantifiedExamples = [],
-  jdMatchedCore = [],
   jdMissingRequired = [],
-  jdMissingDesirable = [],
   educationGaps = [],
   educationItems = [],
 }) => {
-  const count = quantifiedExamples?.length ?? 0;
-
   const serverScore =
     typeof details === "number" ? details : details?.score ?? 0;
 
   const serverKw =
     details && typeof details === "object" ? details.keywords : undefined;
 
-  const cleanMatched = useMemo(() => {
-    // Use AI's evidence if available, otherwise fall back to deterministic
-    const aiMatched =
-      details &&
-      typeof details === "object" &&
-      details.jobFitScore?.debug?.evidencePreview?.matched;
+  // Separate list for missing technical skills (for Skills accordion)
+  const cleanMissingSkills = useMemo(() => {
+    // Prioritize deterministic keyword matching (like live app) over AI evidence
+    const deterministicMissing = serverKw?.missing ?? jdMissingRequired ?? [];
 
-    if (aiMatched && aiMatched.length > 0) {
-      return aiMatched.map((item) => item.item).filter(Boolean);
+    if (deterministicMissing.length > 0) {
+      return deterministicMissing.map(cleanKeyword).filter((k) => k.length > 2);
     }
 
-    return (serverKw?.matched ?? jdMatchedCore ?? [])
-      .map(cleanKeyword)
-      .filter((k) => k.length > 2);
-  }, [serverKw, jdMatchedCore, details]);
-
-  const cleanMissingRequired = useMemo(() => {
-    // Use AI's evidence if available, otherwise fall back to deterministic
+    // Fallback to AI evidence only if deterministic matching fails
     const aiMissing =
       details &&
       typeof details === "object" &&
       details.jobFitScore?.debug?.evidencePreview?.missing;
 
     if (aiMissing && aiMissing.length > 0) {
-      return aiMissing.map((item) => item.item).filter(Boolean);
+      const allMissing = aiMissing.map((item) => item.item).filter(Boolean);
+      return allMissing.map(cleanKeyword).filter((k) => k.length > 2);
     }
 
-    return (serverKw?.missing ?? jdMissingRequired ?? [])
-      .map(cleanKeyword)
-      .filter((k) => k.length > 2);
+    return [];
   }, [serverKw, jdMissingRequired, details]);
-
-  const cleanMissingDesirable = useMemo(
-    () =>
-      (jdMissingDesirable || []).map(cleanKeyword).filter((k) => k.length > 2),
-    [jdMissingDesirable]
-  );
 
   // Prefer server breakdown; merge in parsed feedback messages so "Signals detected" can show.
   const buckets = useMemo<Bucket[]>(() => {
@@ -614,26 +603,13 @@ const ATSBreakdown: React.FC<Props> = ({
                         `Your resume lost ${pointsLost} point${
                           pointsLost !== 1 ? "s" : ""
                         } because it's missing key education details required by the job description.`}
-                      {b.key === "Keywords" &&
-                        `Your resume lost ${pointsLost} point${
-                          pointsLost !== 1 ? "s" : ""
-                        } because it's missing some important keywords from the job description.`}
                     </p>
                   </div>
                 )}
 
                 {/* Dynamic guidance (no static text) */}
                 {(() => {
-                  const reasons = splitReasons(b.message, b.key);
-
-                  // Debug logging for Keywords bucket (can be removed in production)
-                  if (b.key === "Keywords") {
-                    debug("🔍 Keywords bucket debug:", {
-                      message: b.message,
-                      reasons: reasons,
-                      reasonCount: reasons.length,
-                    });
-                  }
+                  const reasons = splitReasons(b.message);
 
                   // Special handling for Summary: show Achieved vs Missing based on reasons
                   const isSummary = b.key === "Summary";
@@ -716,121 +692,6 @@ const ATSBreakdown: React.FC<Props> = ({
                           </h5>
                           <div className="space-y-2">
                             {reasons.map((r, i) => {
-                              // Debug: log all reasons for Keywords bucket (can be removed in production)
-                              if (b.key === "Keywords") {
-                                debug(`🔍 Reason ${i}:`, {
-                                  original: r,
-                                  lowercased: r.toLowerCase(),
-                                  hasMissing: r
-                                    .toLowerCase()
-                                    .includes("missing:"),
-                                });
-                              }
-
-                              // Check if this is a "missing:" line (case insensitive)
-                              if (r.toLowerCase().includes("missing:")) {
-                                // Find the "missing:" part (case insensitive) and extract everything after it
-                                const missingIndex = r
-                                  .toLowerCase()
-                                  .indexOf("missing:");
-                                const missingText =
-                                  missingIndex >= 0
-                                    ? r
-                                        .substring(
-                                          missingIndex + "missing:".length
-                                        )
-                                        .trim()
-                                    : "";
-                                const keywords = missingText
-                                  .split(",")
-                                  .map((k) => k.trim())
-                                  .filter((k) => k.length > 0);
-
-                                // Debug logging for missing keywords (can be removed in production)
-                                debug("🔍 Missing keywords debug:", {
-                                  originalReason: r,
-                                  missingText: missingText,
-                                  keywords: keywords,
-                                  keywordCount: keywords.length,
-                                });
-
-                                return (
-                                  <div key={i}>
-                                    <div className="text-sm font-semibold text-gray-800 mb-2">
-                                      ❌ Missing Keywords ({keywords.length})
-                                    </div>
-                                    <div className="flex flex-wrap gap-2">
-                                      {keywords.map((keyword, idx) => (
-                                        <span
-                                          key={`missing-keyword-${idx}`}
-                                          className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 text-red-700 px-2 py-1 text-xs font-medium"
-                                        >
-                                          <Image
-                                            src="/icons/cross.svg"
-                                            alt="✗"
-                                            width={12}
-                                            height={12}
-                                          />
-                                          {keyword
-                                            .split(" ")
-                                            .map(
-                                              (word) =>
-                                                word.charAt(0).toUpperCase() +
-                                                word.slice(1).toLowerCase()
-                                            )
-                                            .join(" ")}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  </div>
-                                );
-                              } else if (
-                                r.toLowerCase().includes("matches") &&
-                                r.toLowerCase().includes("keywords")
-                              ) {
-                                // Handle the "Matches X% of Job Description keywords" case
-                                return (
-                                  <div
-                                    key={i}
-                                    className="text-sm text-gray-700"
-                                  >
-                                    {r
-                                      .split(" ")
-                                      .map((word) => {
-                                        // Keep certain words lowercase
-                                        const lowercaseWords = [
-                                          "of",
-                                          "and",
-                                          "or",
-                                          "the",
-                                          "a",
-                                          "an",
-                                          "in",
-                                          "on",
-                                          "at",
-                                          "to",
-                                          "for",
-                                          "with",
-                                          "by",
-                                        ];
-                                        if (
-                                          lowercaseWords.includes(
-                                            word.toLowerCase()
-                                          )
-                                        ) {
-                                          return word.toLowerCase();
-                                        }
-                                        // Capitalize first letter of other words
-                                        return (
-                                          word.charAt(0).toUpperCase() +
-                                          word.slice(1).toLowerCase()
-                                        );
-                                      })
-                                      .join(" ")}
-                                  </div>
-                                );
-                              }
-
                               // Special handling for Experience bucket - convert technical terms to user-friendly language
                               if (b.key === "Experience") {
                                 let userFriendlyText = r;
@@ -1193,14 +1054,14 @@ const ATSBreakdown: React.FC<Props> = ({
                   </div>
                 )}
 
-                {b.key === "Skills" && cleanMissingRequired.length > 0 && (
+                {b.key === "Skills" && cleanMissingSkills.length > 0 && (
                   <div className="mt-3">
                     <h5 className="text-sm font-semibold text-gray-800 mb-2">
-                      ❌ Missing skills from job description (
-                      {cleanMissingRequired.length} skills missing):
+                      ❌ Missing skills/keywords from job description (
+                      {cleanMissingSkills.length} skills missing):
                     </h5>
                     <div className="flex flex-wrap gap-2">
-                      {cleanMissingRequired.map((skill, i) => (
+                      {cleanMissingSkills.map((skill, i) => (
                         <span
                           key={`missing-${skill}-${i}`}
                           className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 text-red-700 px-2 py-1 text-xs font-medium"

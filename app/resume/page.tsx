@@ -303,6 +303,13 @@ const ResumePage = () => {
       debug("✅ Full API Response:", result);
       debug("🔍 About to check result.success:", result.success);
 
+      // Temporary: Always log full response for debugging
+      const responseSize = JSON.stringify(result).length;
+      console.log(
+        `🔍 FULL API RESPONSE (always visible) - Size: ${responseSize} chars:`,
+        JSON.stringify(result, null, 2)
+      );
+
       if (result.success) {
         debug("🔍 ENTERING SUCCESS BLOCK - localStorage storage will happen");
         debug("🔍 API Response received:", {
