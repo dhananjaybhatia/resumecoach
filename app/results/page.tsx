@@ -12,6 +12,12 @@ import { pdf } from "@react-pdf/renderer";
 import { debug, debugOnce } from "@/lib/debug";
 import { isQuantified } from "@/lib/isQuantified";
 
+// Helper function to capitalize first letter of each sentence
+const capitalizeFirst = (text: string): string => {
+  if (!text) return text;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+};
+
 /* =========================
    Build fingerprint
    ========================= */
@@ -1079,8 +1085,8 @@ ${data.analysis.analysisLists?.overallSummary || "No summary available"}
                   </h3>
                   <ul className="list-disc pl-5 space-y-1 text-rose-900">
                     {gapsArr.length
-                      ? gapsArr.map((s, i) => <li key={i}>{s}</li>)
-                      : improvementsArr.map((s, i) => <li key={i}>{s}</li>)}
+                      ? gapsArr.map((s, i) => <li key={i}>{capitalizeFirst(s)}</li>)
+                      : improvementsArr.map((s, i) => <li key={i}>{capitalizeFirst(s)}</li>)}
                   </ul>
                 </div>
 
@@ -1090,7 +1096,7 @@ ${data.analysis.analysisLists?.overallSummary || "No summary available"}
                   </h3>
                   <ul className="list-disc pl-5 space-y-1 text-amber-900">
                     {improvementsArr.map((s, i) => (
-                      <li key={i}>{s}</li>
+                      <li key={i}>{capitalizeFirst(s)}</li>
                     ))}
                   </ul>
                 </div>
@@ -1101,7 +1107,7 @@ ${data.analysis.analysisLists?.overallSummary || "No summary available"}
                   </h3>
                   <ul className="list-disc pl-5 space-y-1 text-indigo-900">
                     {recommendationsArr.map((s, i) => (
-                      <li key={i}>{s}</li>
+                      <li key={i}>{capitalizeFirst(s)}</li>
                     ))}
                   </ul>
                 </div>

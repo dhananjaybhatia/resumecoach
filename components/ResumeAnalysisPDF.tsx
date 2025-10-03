@@ -1,5 +1,11 @@
 import { Page, Text, View, Document, StyleSheet } from "@react-pdf/renderer";
 
+// Helper function to capitalize first letter of each sentence
+const capitalizeFirst = (text: string): string => {
+  if (!text) return text;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+};
+
 const styles = StyleSheet.create({
   page: { padding: 30, fontSize: 12, fontFamily: "Helvetica" },
   header: { fontSize: 18, marginBottom: 20, fontWeight: "bold" },
@@ -150,7 +156,7 @@ const ResumeAnalysisPDF = ({
           <Text style={styles.sectionTitle}>OPPORTUNITIES TO IMPROVE</Text>
           {analysisLists.improvements?.map((item: string, index: number) => (
             <Text key={index} style={styles.listItem}>
-              • {item}
+              • {capitalizeFirst(item)}
             </Text>
           )) || <Text>No improvement suggestions available</Text>}
         </View>
@@ -160,7 +166,7 @@ const ResumeAnalysisPDF = ({
           <Text style={styles.sectionTitle}>GAPS</Text>
           {analysisLists.gaps?.map((item: string, index: number) => (
             <Text key={index} style={styles.listItem}>
-              • {item}
+              • {capitalizeFirst(item)}
             </Text>
           )) || <Text>No gaps identified</Text>}
         </View>
@@ -170,7 +176,7 @@ const ResumeAnalysisPDF = ({
           <Text style={styles.sectionTitle}>RECOMMENDATIONS</Text>
           {analysisLists.recommendations?.map((item: string, index: number) => (
             <Text key={index} style={styles.listItem}>
-              • {item}
+              • {capitalizeFirst(item)}
             </Text>
           )) || <Text>No recommendations available</Text>}
         </View>

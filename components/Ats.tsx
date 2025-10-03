@@ -8,12 +8,18 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 
+// Helper function to capitalize first letter
+const capitalizeFirst = (text: string): string => {
+  if (!text) return text;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+};
+
 // Helper function to clean keywords
 const cleanKeyword = (keyword: string): string => {
   if (!keyword) return "";
 
   // Remove common sentence endings and parentheticals
-  let cleaned = keyword
+  const cleaned = keyword
     .replace(
       /\b(?:is|are|was|were|has|have|had|will|would|could|should|must|can|may|might)\b.*$/i,
       ""
@@ -34,7 +40,7 @@ const cleanKeyword = (keyword: string): string => {
 
   // Filter out bad keywords (sentence fragments, generic terms, etc.)
   const badPatterns = [
-    /^(about you|data integrity|team capability|database systems|cfo|about you ca|cpa)$/i,
+    /^(about you|data integrity|team capability|database systems|cfo|about you ca|business units|erp|it)$/i,
     /^(some|like|and|or|the|a|an|is|are|was|were|has|have|had|will|would|could|should|must|can|may|might)$/i,
     /^(provide|deliver|create|build|develop|manage|lead|support|ensure|implement|design|analyze|optimize|solve|coordinate|collaborate|translate|integrate|drive|inform|map|automate)\s/i,
     /\b(highly desired|preferred|required|essential|necessary|important|critical|mandatory)\b/i,
@@ -43,6 +49,7 @@ const cleanKeyword = (keyword: string): string => {
     /^(experience working with|experience in|experience with|experience of)\s/i,
     /^(strong|solid|excellent|good|basic|intermediate|advanced)\s/i,
     /^(ability to|capability to|skills in|knowledge of|understanding of)\s/i,
+    /^(prepare|oversee|analytical|excellent|self-motivated|hold)$/i,
   ];
 
   // If it matches bad patterns, return empty string
@@ -1072,7 +1079,7 @@ const ATSBreakdown: React.FC<Props> = ({
                             width={12}
                             height={12}
                           />
-                          {skill}
+                          {capitalizeFirst(skill)}
                         </span>
                       ))}
                     </div>

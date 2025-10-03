@@ -19,7 +19,7 @@ export const anonLimiter = new Ratelimit({
 
 export const userLimiter = new Ratelimit({
     redis,
-    limiter: Ratelimit.slidingWindow(30, '24h'), // 2 free scans per day for signed-in users
+    limiter: Ratelimit.slidingWindow(40, '24h'), // 2 free scans per day for signed-in users
     prefix: 'ratelimit:user',
 });
 export const subscriptionLimiter = new Ratelimit({

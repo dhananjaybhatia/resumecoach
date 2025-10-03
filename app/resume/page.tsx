@@ -32,7 +32,7 @@ const resumeFormSchema = z.object({
   companyName: z.string().min(1, "Company name is required"),
   jobTitle: z.string().min(1, "Job title is required"),
   country: z.string().min(1, "Country is required"),
-  state: z.string().min(1, "State/Province is required"),
+  state: z.string().optional(),
   jobDescription: z
     .string()
     .min(50, "Job description must be at least 50 characters") // ← Change from 10 to 50
@@ -619,9 +619,7 @@ const ResumePage = () => {
                   </SelectContent>
                 </Select>
                 {errors.state && (
-                  <p className="text-red-500 text-sm">
-                    {errors.state.message || "State/Province is required"}
-                  </p>
+                  <p className="text-red-500 text-sm">{errors.state.message}</p>
                 )}
               </div>
             </div>
